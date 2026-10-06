@@ -2,8 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-type Customer = { id: string; phone: string; firstName: string; lastName: string; birthDate: string; marketing: boolean };
-type Order = { id: string; total: number; items: { id: string; qty: number }[]; code: string | null; city: string; createdAt: string };
+import type { ApiCustomer } from "@/lib/api";
 
 type ShopState = {
   cart: Record<string, number>;
@@ -13,8 +12,6 @@ type ShopState = {
   favorites: string[];
   recent: string[];
   recentQueries: string[];
-  customer: Customer | null;
-  orders: Order[];
   add: (id: string, qty?: number) => void;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
@@ -25,8 +22,6 @@ type ShopState = {
   toggleFav: (id: string) => void;
   viewed: (id: string) => void;
   searched: (q: string) => void;
-  setCustomer: (c: Customer) => void;
-  addOrder: (o: Order) => void;
 };
 
 export const useShop = create<ShopState>()(
@@ -39,8 +34,6 @@ export const useShop = create<ShopState>()(
       favorites: [],
       recent: [],
       recentQueries: [],
-      customer: null,
-      orders: [],
       add: (id, qty = 1) => set((s) => ({ cart: { ...s.cart, [id]: (s.cart[id] || 0) + qty } })),
       setQty: (id, qty) =>
         set((s) => {
@@ -58,10 +51,12 @@ export const useShop = create<ShopState>()(
       toggleFav: (id) => set((s) => ({ favorites: s.favorites.includes(id) ? s.favorites.filter((x) => x !== id) : [...s.favorites, id] })),
       viewed: (id) => set((s) => ({ recent: [id, ...s.recent.filter((x) => x !== id)].slice(0, 12) })),
       searched: (q) => set((s) => ({ recentQueries: [q, ...s.recentQueries.filter((x) => x !== q)].slice(0, 5) })),
-      setCustomer: (customer) => set({ customer }),
-      addOrder: (o) => set((s) => ({ orders: [o, ...s.orders] })),
     }),
-    { name: "nabi-shop" }
+    {
+      name: "nabi-shop",
+      // Клиент больше не хранится в браузере: источник правды — сессия на сервере.
+      partialize: ({ cart, promo, samples, city, favorites, recent, recentQueries }) => ({ cart, promo, samples, city, favorites, recent, recentQueries }),
+    }
   )
 );
 
@@ -94,3 +89,11 @@ export function useHydrated() {
   useEffect(() => setH(true), []);
   return h;
 }
+
+// Текущий клиент из серверной сессии. loaded=false, пока не пришёл ответ /api/auth/me.
+type SessionState = { customer: ApiCustomer | null; loaded: boolean; setCustomer: (c: ApiCustomer | null) => void };
+export const useSession = create<SessionState>((set) => ({
+  customer: null,
+  loaded: false,
+  setCustomer: (customer) => set({ customer, loaded: true }),
+}));

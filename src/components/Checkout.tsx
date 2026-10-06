@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { CITIES } from "@/lib/shop";
 import { useCartTotals } from "@/lib/useCart";
 import { track } from "@/lib/analytics";
-import { useShop } from "@/store/shop";
+import { ApiError, api, storedUtm } from "@/lib/api";
+import { useSession, useShop } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { PromoField, Summary } from "./Cart";
@@ -18,21 +19,20 @@ function fmtPhone(d: string) {
 }
 
 type Step = "phone" | "code" | "profile" | "delivery";
-const DEMO_CODE = "111111"; // В рабочей версии код проверяет сервер через Telegram Gateway.
 
 function StepCard({ n, title, done, active, onEdit, summary, children }: { n: number; title: string; done: boolean; active: boolean; onEdit?: () => void; summary?: React.ReactNode; children: React.ReactNode }) {
   const { t } = useI18n();
   return (
-    <section className={`rounded-panel p-5 md:p-6 ${active ? "shadow-float ring-1 ring-line" : "bg-surface"}`}>
+    <section className={`rounded-panel p-5 transition-shadow duration-300 md:p-6 ${active ? "shadow-float ring-1 ring-line" : "bg-surface"}`}>
       <div className="flex items-center gap-3">
-        <span className={`grid size-8 shrink-0 place-items-center rounded-full text-[14px] font-bold ${done ? "bg-success text-white" : active ? "bg-accent text-white" : "bg-white text-muted"}`}>
+        <span className={`grid size-8 shrink-0 place-items-center rounded-full text-[14px] font-bold transition-colors ${done ? "bg-success text-white" : active ? "bg-accent text-white" : "bg-white text-muted"}`}>
           {done ? <Icon name="check" size={16} /> : n}
         </span>
         <h2 className={`text-[18px] font-bold ${!active && !done ? "text-muted" : ""}`}>{title}</h2>
         {done && !active && onEdit && <button type="button" onClick={onEdit} className="ml-auto text-[14px] text-accent">{t.edit}</button>}
       </div>
       {done && !active && summary && <div className="mt-2 pl-11 text-[14px] text-ink/75">{summary}</div>}
-      {active && <div className="mt-5">{children}</div>}
+      {active && <div className="anim-panel mt-5">{children}</div>}
     </section>
   );
 }
@@ -43,26 +43,30 @@ function Field({ label, id, error, children, hint }: { label: string; id: string
       <label htmlFor={id} className="text-[13px] font-medium text-ink/70">{label}</label>
       <div className="mt-1">{children}</div>
       {hint && !error && <p className="mt-1 text-[12px] text-muted">{hint}</p>}
-      {error && <p className="mt-1 text-[12px] text-warn">{error}</p>}
+      {error && <p role="alert" className="mt-1 text-[12px] text-warn">{error}</p>}
     </div>
   );
 }
 const inputCls = "h-12 w-full rounded-xl border border-line bg-white px-3.5 text-[16px] outline-none focus:border-accent";
+const Spinner = () => <span className="size-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />;
 
 export function Checkout() {
   const { lang, t } = useI18n();
   const totals = useCartTotals();
-  const customer = useShop((s) => s.customer);
-  const setCustomer = useShop((s) => s.setCustomer);
+  const customer = useSession((s) => s.customer);
+  const sessionLoaded = useSession((s) => s.loaded);
+  const setCustomer = useSession((s) => s.setCustomer);
   const setCity = useShop((s) => s.setCity);
-  const addOrder = useShop((s) => s.addOrder);
   const clearCart = useShop((s) => s.clearCart);
   const promo = useShop((s) => s.promo);
+  const samples = useShop((s) => s.samples);
 
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [demoCode, setDemoCode] = useState<string | null>(null);
+  const [guest, setGuest] = useState(false); // нет Telegram: заказ без кода, подтверждение звонком
   const [code, setCode] = useState("");
-  const [codeErr, setCodeErr] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [verified, setVerified] = useState(false);
   const [returning, setReturning] = useState(false);
@@ -75,20 +79,24 @@ export function Checkout() {
   const [comment, setComment] = useState("");
   const [pay, setPay] = useState<"click" | "payme" | "cash">("click");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [done, setDone] = useState<{ id: string; code: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<{ number: string; code: string | null; status: string } | null>(null);
   const codeRef = useRef<HTMLInputElement>(null);
 
-  // Уже вошедший клиент: сразу к доставке.
+  // Уже вошедший клиент: сразу к доставке, адрес из прошлого заказа.
   useEffect(() => {
-    if (totals.hydrated && customer && !verified) {
-      setPhone(customer.phone);
-      setFirst(customer.firstName);
-      setLast(customer.lastName);
-      setVerified(true);
-      setReturning(true);
-      setStep("delivery");
-    }
-  }, [totals.hydrated, customer, verified]);
+    if (!sessionLoaded || !customer || verified) return;
+    setPhone(customer.phone);
+    setFirst(customer.firstName ?? "");
+    setLast(customer.lastName ?? "");
+    setVerified(true);
+    if (customer.needsProfile) { setStep("profile"); return; }
+    setReturning(true);
+    setStep("delivery");
+    api.me().then((r) => {
+      if (r.address) { setAddress(r.address.address); setComment(r.address.comment ?? ""); setCity(r.address.city); }
+    }).catch(() => {});
+  }, [sessionLoaded, customer, verified, setCity]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -106,13 +114,14 @@ export function Checkout() {
   if (done)
     return (
       <div className="wrap max-w-[640px] py-12 text-center">
-        <span className="mx-auto grid size-16 place-items-center rounded-full bg-success text-white"><Icon name="check" size={32} /></span>
+        <span className="anim-bump mx-auto grid size-16 place-items-center rounded-full bg-success text-white"><Icon name="check" size={32} /></span>
         <h1 className="mt-5 text-[30px] font-bold">{t.coDoneTitle}</h1>
-        <p className="mt-2 text-ink/75">{t.coDoneText(done.id)}</p>
+        <p className="mt-2 text-ink/75">{t.coDoneText(done.number)}</p>
+        {done.status === "needs_call" && <p className="mt-2 text-[14px]">{t.coNeedsCall}</p>}
         {done.code && <p className="mt-2 text-[14px] text-accent">{t.coDoneCreator(done.code)}</p>}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <a href="https://t.me/" target="_blank" rel="noreferrer" className="flex h-12 items-center gap-2 rounded-card bg-accent px-5 font-semibold text-white"><Icon name="telegram" size={18} /> {t.coTrack}</a>
-          <Link href={`/${lang}`} className="grid h-12 place-items-center rounded-card bg-surface px-5 font-semibold">{t.continueShopping}</Link>
+          <Link href={`/${lang}/account`} className="grid h-12 place-items-center rounded-card bg-surface px-5 font-semibold">{t.profile}</Link>
         </div>
       </div>
     );
@@ -129,52 +138,127 @@ export function Checkout() {
   const isTashkent = totals.city === "tashkent";
   const payMethod = !isTashkent && pay === "cash" ? "click" : pay;
 
-  const requestCode = () => {
+  const errorText = (e: unknown) => {
+    const c = e instanceof ApiError ? e.code : "";
+    if (c === "too_many_requests" || c === "too_many_attempts") return t.coTooMany;
+    if (c === "expired" || c === "request_not_found") return t.coExpired;
+    if (c === "gateway_unavailable") return t.coGatewayDown;
+    return t.coGatewayDown;
+  };
+
+  const requestCode = async () => {
     if (phoneDigits.length !== 9) { setErrors({ phone: t.coRequired }); return; }
     setErrors({});
-    setStep("code");
-    setResendIn(60);
-    setCode("");
-    track("otp_requested", { channel: "telegram" });
-    setTimeout(() => codeRef.current?.focus(), 50);
+    setBusy(true);
+    try {
+      const r = await api.requestCode(phoneDigits);
+      track("otp_requested", { channel: r.channel });
+      if (r.channel === "none") { setGuest(true); setStep("profile"); return; }
+      setRequestId(r.requestId!);
+      setDemoCode(r.demoCode ?? null);
+      setStep("code");
+      setResendIn(60);
+      setCode("");
+      setTimeout(() => codeRef.current?.focus(), 50);
+    } catch (e) {
+      setErrors({ phone: errorText(e) });
+      track("otp_failed", { reason: e instanceof ApiError ? e.code : "network" });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const checkCode = (v: string) => {
+  const checkCode = async (v: string) => {
     setCode(v);
-    setCodeErr(false);
-    if (v.length < 6) return;
-    if (v !== DEMO_CODE) { setCodeErr(true); track("otp_failed", { reason: "wrong_code" }); return; }
-    track("otp_verified", { channel: "telegram" });
-    setVerified(true);
-    if (customer && customer.phone === fmtPhone(phoneDigits)) { setReturning(true); setStep("delivery"); }
-    else setStep("profile");
+    setErrors({});
+    if (v.length < 6 || !requestId) return;
+    setBusy(true);
+    try {
+      const r = await api.verifyCode(requestId, v);
+      track("otp_verified", { channel: demoCode ? "demo" : "telegram", is_new: r.isNew });
+      setCustomer(r.customer);
+      setVerified(true);
+      if (r.customer.needsProfile) setStep("profile");
+      else {
+        setFirst(r.customer.firstName ?? "");
+        setLast(r.customer.lastName ?? "");
+        setReturning(true);
+        setStep("delivery");
+        api.me().then((m) => { if (m.address) { setAddress(m.address.address); setCity(m.address.city); } }).catch(() => {});
+      }
+    } catch (e) {
+      const left = e instanceof ApiError ? (e.data.attemptsLeft as number | undefined) : undefined;
+      const msg = e instanceof ApiError && e.code === "code_invalid" ? `${t.coWrongCode}${left !== undefined ? " " + t.coAttemptsLeft(left) : ""}` : errorText(e);
+      setErrors({ code: msg });
+      track("otp_failed", { reason: e instanceof ApiError ? e.code : "network" });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const saveProfile = () => {
-    const e: Record<string, string> = {};
-    if (!first.trim()) e.first = t.coRequired;
-    if (!last.trim()) e.last = t.coRequired;
+  const birthDate = () => {
     const d = Number(bd.d), m = Number(bd.m), y = Number(bd.y);
+    if (!d && !m && !y) return { value: null, ok: true };
     const date = new Date(y, m - 1, d);
     const age = (Date.now() - date.getTime()) / (365.25 * 86400000);
-    if (!d || !m || !y || date.getDate() !== d || age < 14 || age > 100) e.birth = t.coBirthInvalid;
-    if (!consent) e.consent = t.coRequired;
+    const ok = !!d && !!m && !!y && date.getDate() === d && age >= 14 && age <= 100;
+    return { value: ok ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null, ok };
+  };
+
+  const saveProfile = async () => {
+    const e: Record<string, string> = {};
+    if (!first.trim()) e.first = t.coRequired;
+    if (!guest) {
+      if (!last.trim()) e.last = t.coRequired;
+      const b = birthDate();
+      if (!b.ok || !b.value) e.birth = t.coBirthInvalid;
+      if (!consent) e.consent = t.coRequired;
+    }
     setErrors(e);
     Object.keys(e).forEach((f) => track("checkout_error", { field: f }));
     if (Object.keys(e).length) return;
-    setCustomer({ id: crypto.randomUUID(), phone: fmtPhone(phoneDigits), firstName: first.trim(), lastName: last.trim(), birthDate: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`, marketing });
-    track("signup_completed", { marketing_opt_in: marketing });
-    setStep("delivery");
+    if (guest) { setStep("delivery"); return; }
+    setBusy(true);
+    try {
+      const r = await api.saveProfile({ firstName: first.trim(), lastName: last.trim(), birthDate: birthDate().value, consent: true, marketing, lang, utm: storedUtm() });
+      setCustomer(r.customer);
+      track("signup_completed", { marketing_opt_in: marketing });
+      setStep("delivery");
+    } catch {
+      setErrors({ profile: t.coOrderError });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const place = () => {
-    if (!address.trim()) { setErrors({ address: t.coRequired }); track("checkout_error", { field: "address" }); return; }
-    const id = `N-${Math.floor(100000 + Math.random() * 900000)}`;
-    addOrder({ id, total: totals.total, items: totals.lines.map((l) => ({ id: l.p.id, qty: l.qty })), code: promo, city: totals.city, createdAt: new Date().toISOString() });
-    track("purchase", { order_id: id, value: totals.total, discount: totals.discount, creator_code: promo, payment: payMethod, city: totals.city });
-    setDone({ id, code: promo });
-    clearCart();
-    window.scrollTo({ top: 0 });
+  const place = async () => {
+    if (!address.trim() || address.trim().length < 3) { setErrors({ address: t.coRequired }); track("checkout_error", { field: "address" }); return; }
+    setBusy(true);
+    setErrors({});
+    try {
+      const r = await api.createOrder({
+        items: totals.lines.map((l) => ({ id: l.p.id, qty: l.qty })),
+        promo,
+        city: totals.city,
+        address: address.trim(),
+        comment: comment.trim() || undefined,
+        payment: payMethod,
+        samples,
+        lang,
+        utm: storedUtm(),
+        guest: guest ? { phone: phoneDigits, firstName: first.trim() } : undefined,
+      });
+      track("purchase", { order_id: r.number, value: r.total, discount: totals.discount, creator_code: r.creatorCode, payment: payMethod, city: totals.city, status: r.status });
+      setDone({ number: r.number, code: r.creatorCode, status: r.status });
+      clearCart();
+      if (customer) setCustomer({ ...customer, ordersCount: customer.ordersCount + 1 });
+      window.scrollTo({ top: 0 });
+    } catch (e) {
+      setErrors({ place: t.coOrderError });
+      track("checkout_error", { field: "place", reason: e instanceof ApiError ? e.code : "network" });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const years = Array.from({ length: 80 }, (_, i) => new Date().getFullYear() - 14 - i);
@@ -183,26 +267,35 @@ export function Checkout() {
   return (
     <div className="wrap pt-6 md:pt-10">
       <h1 className="h-section">{t.coTitle}</h1>
-      <p className="mt-2 text-[13px] text-muted">{t.demoNote}</p>
       <div className="mt-6 grid gap-8 md:grid-cols-[1fr_400px] md:gap-12">
         <div className="min-w-0 space-y-4">
           {/* 1. Телефон и код */}
-          <StepCard n={1} title={t.coPhone} done={verified} active={step === "phone" || step === "code"} summary={<>{fmtPhone(phoneDigits)} {returning && customer && <span className="ml-2 text-success">{t.coWelcomeBack(customer.firstName)}</span>}</>}>
+          <StepCard
+            n={1}
+            title={t.coPhone}
+            done={verified || (guest && step !== "phone")}
+            active={step === "phone" || step === "code"}
+            onEdit={!returning ? () => { setVerified(false); setGuest(false); setStep("phone"); } : undefined}
+            summary={<>{fmtPhone(phoneDigits)} {returning && customer?.firstName && <span className="ml-2 text-success">{t.coWelcomeBack(customer.firstName)}</span>}</>}
+          >
             {step === "phone" ? (
               <div className="space-y-3">
                 <Field label={t.coPhone} id="phone" error={errors.phone}>
                   <input id="phone" type="tel" inputMode="tel" autoComplete="tel" value={fmtPhone(phoneDigits)} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === "Enter" && requestCode()} className={`${inputCls} tabular`} />
                 </Field>
-                <button type="button" onClick={requestCode} disabled={phoneDigits.length !== 9} className="flex h-12 w-full items-center justify-center gap-2 rounded-card bg-accent font-semibold text-white disabled:opacity-40">
-                  <Icon name="telegram" size={20} /> {t.coGetCode}
+                <button type="button" onClick={requestCode} disabled={phoneDigits.length !== 9 || busy} className="flex h-12 w-full items-center justify-center gap-2 rounded-card bg-accent font-semibold text-white transition active:scale-[.98] disabled:opacity-40">
+                  {busy ? <Spinner /> : <Icon name="telegram" size={20} />} {t.coGetCode}
                 </button>
                 <p className="text-[12px] text-muted">{t.coNoTg}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-[14px]">{t.coCodeSent(fmtPhone(phoneDigits))}</p>
-                <p className="rounded-xl bg-accent-soft px-3 py-2 text-[13px] text-ink/80">{t.coCodeHint}</p>
-                <Field label={t.coCode} id="otp" error={codeErr ? t.coWrongCode : undefined}>
+                <p className="rounded-xl bg-accent-soft px-3 py-2 text-[13px] text-ink/80">
+                  {t.coCodeHint}
+                  {demoCode && <><br /><b>Демо-режим:</b> код {demoCode}</>}
+                </p>
+                <Field label={t.coCode} id="otp" error={errors.code}>
                   <input
                     ref={codeRef}
                     id="otp"
@@ -210,6 +303,7 @@ export function Checkout() {
                     autoComplete="one-time-code"
                     maxLength={6}
                     value={code}
+                    disabled={busy}
                     onChange={(e) => checkCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     className={`${inputCls} text-center text-[24px] font-bold tracking-[0.5em] tabular`}
                     placeholder="••••••"
@@ -223,44 +317,61 @@ export function Checkout() {
             )}
           </StepCard>
 
-          {/* 2. О вас (только новые клиенты) */}
+          {/* 2. О вас (новые клиенты) или имя для заказа без Telegram */}
           {!returning && (
-            <StepCard n={2} title={t.coAboutYou} done={stepIndex > 2} active={step === "profile"} onEdit={() => setStep("profile")} summary={`${first} ${last}`}>
+            <StepCard n={2} title={guest ? t.coGuestName : t.coAboutYou} done={stepIndex > 2} active={step === "profile"} onEdit={() => setStep("profile")} summary={`${first} ${last}`}>
+              {guest && (
+                <div className="mb-4 rounded-xl bg-surface p-3 text-[14px]">
+                  <p className="font-semibold">{t.coNoTgTitle}</p>
+                  <p className="text-ink/70">{t.coNoTgText}</p>
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={`${t.coFirst} *`} id="first" error={errors.first}>
                   <input id="first" autoComplete="given-name" value={first} onChange={(e) => setFirst(e.target.value)} className={inputCls} />
                 </Field>
-                <Field label={`${t.coLast} *`} id="last" error={errors.last}>
-                  <input id="last" autoComplete="family-name" value={last} onChange={(e) => setLast(e.target.value)} className={inputCls} />
-                </Field>
-                <div className="sm:col-span-2">
-                  <Field label={t.coBirth} id="bd-d" error={errors.birth} hint={t.coBirthHint}>
-                    <div className="grid grid-cols-[1fr_1.6fr_1.2fr] gap-2">
-                      <select id="bd-d" aria-label={t.coDay} value={bd.d} onChange={(e) => setBd({ ...bd, d: e.target.value })} className={inputCls}>
-                        <option value="">{t.coDay}</option>
-                        {Array.from({ length: 31 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
-                      </select>
-                      <select id="bd-m" aria-label={t.coMonth} value={bd.m} onChange={(e) => setBd({ ...bd, m: e.target.value })} className={inputCls}>
-                        <option value="">{t.coMonth}</option>
-                        {t.months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                      </select>
-                      <select id="bd-y" aria-label={t.coYear} value={bd.y} onChange={(e) => setBd({ ...bd, y: e.target.value })} className={inputCls}>
-                        <option value="">{t.coYear}</option>
-                        {years.map((y) => <option key={y} value={y}>{y}</option>)}
-                      </select>
-                    </div>
+                {!guest && (
+                  <Field label={`${t.coLast} *`} id="last" error={errors.last}>
+                    <input id="last" autoComplete="family-name" value={last} onChange={(e) => setLast(e.target.value)} className={inputCls} />
                   </Field>
-                </div>
+                )}
+                {!guest && (
+                  <div className="sm:col-span-2">
+                    <Field label={`${t.coBirth} *`} id="bd-d" error={errors.birth} hint={t.coBirthHint}>
+                      <div className="grid grid-cols-[1fr_1.6fr_1.2fr] gap-2">
+                        <select id="bd-d" aria-label={t.coDay} value={bd.d} onChange={(e) => setBd({ ...bd, d: e.target.value })} className={inputCls}>
+                          <option value="">{t.coDay}</option>
+                          {Array.from({ length: 31 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
+                        </select>
+                        <select id="bd-m" aria-label={t.coMonth} value={bd.m} onChange={(e) => setBd({ ...bd, m: e.target.value })} className={inputCls}>
+                          <option value="">{t.coMonth}</option>
+                          {t.months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                        </select>
+                        <select id="bd-y" aria-label={t.coYear} value={bd.y} onChange={(e) => setBd({ ...bd, y: e.target.value })} className={inputCls}>
+                          <option value="">{t.coYear}</option>
+                          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                      </div>
+                    </Field>
+                  </div>
+                )}
               </div>
-              <label className="mt-4 flex items-start gap-2.5 text-[14px]">
-                <input id="consent" type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--color-accent)]" />
-                <span>{t.coConsent} <span className="text-accent">*</span>{errors.consent && <span className="block text-[12px] text-warn">{errors.consent}</span>}</span>
-              </label>
-              <label className="mt-2 flex items-start gap-2.5 text-[14px]">
-                <input id="marketing" type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--color-accent)]" />
-                {t.coMarketing}
-              </label>
-              <button type="button" onClick={saveProfile} className="mt-5 h-12 w-full rounded-card bg-accent font-semibold text-white">{t.next}</button>
+              {!guest && (
+                <>
+                  <label className="mt-4 flex items-start gap-2.5 text-[14px]">
+                    <input id="consent" type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--color-accent)]" />
+                    <span>{t.coConsent} <span className="text-accent">*</span>{errors.consent && <span className="block text-[12px] text-warn">{errors.consent}</span>}</span>
+                  </label>
+                  <label className="mt-2 flex items-start gap-2.5 text-[14px]">
+                    <input id="marketing" type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--color-accent)]" />
+                    {t.coMarketing}
+                  </label>
+                </>
+              )}
+              {errors.profile && <p role="alert" className="mt-3 text-[13px] text-warn">{errors.profile}</p>}
+              <button type="button" onClick={saveProfile} disabled={busy} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-card bg-accent font-semibold text-white transition active:scale-[.98] disabled:opacity-60">
+                {busy && <Spinner />} {t.next}
+              </button>
             </StepCard>
           )}
 
@@ -282,7 +393,7 @@ export function Checkout() {
                 <legend className="text-[13px] font-medium text-ink/70">{t.coPayment}</legend>
                 <div className="mt-1 grid gap-2 sm:grid-cols-3">
                   {(["click", "payme", "cash"] as const).filter((m) => m !== "cash" || isTashkent).map((m) => (
-                    <label key={m} className={`flex h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-[15px] ${payMethod === m ? "border-accent bg-accent-soft" : "border-line"}`}>
+                    <label key={m} className={`flex h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-[15px] transition-colors ${payMethod === m ? "border-accent bg-accent-soft" : "border-line"}`}>
                       <input type="radio" name="pay" value={m} checked={payMethod === m} onChange={() => setPay(m)} className="accent-[var(--color-accent)]" />
                       {m === "click" ? "Click" : m === "payme" ? "Payme" : t.coCash}
                     </label>
@@ -308,9 +419,12 @@ export function Checkout() {
             <PromoField />
             <Summary
               cta={
-                <button type="button" disabled={step !== "delivery"} onClick={place} className="mt-3 h-14 w-full rounded-card bg-accent text-[16px] font-semibold text-white disabled:opacity-40">
-                  {t.coPlace}
-                </button>
+                <>
+                  {errors.place && <p role="alert" className="text-[13px] text-warn">{errors.place}</p>}
+                  <button type="button" disabled={step !== "delivery" || busy} onClick={place} className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-card bg-accent text-[16px] font-semibold text-white transition active:scale-[.98] disabled:opacity-40">
+                    {busy && step === "delivery" && <Spinner />} {t.coPlace}
+                  </button>
+                </>
               }
             />
           </div>

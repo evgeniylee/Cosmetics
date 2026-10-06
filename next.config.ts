@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Драйверы БД работают только на сервере и не бандлятся (PGlite тянет WASM).
+  serverExternalPackages: ["@electric-sql/pglite", "pg"],
 };
 
 export default nextConfig;
