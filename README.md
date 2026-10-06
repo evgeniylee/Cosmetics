@@ -60,6 +60,14 @@ npm run dev        # http://localhost:3000 → /ru
 | `src/app/api/` | API-маршруты |
 | `src/components/` | UI-компоненты |
 
+## Изображения
+
+- `public/images/icons/` — 3D-иконки категорий (WebP с прозрачностью, 480×480).
+- `public/images/hero/` — фоны главного баннера для десктопа и телефона.
+- Новые иконки на белом фоне: `python3 scripts/cutout-icons.py spf.jpg toner.jpg` — скрипт вырежет фон,
+  обрежет по объекту и сохранит `public/images/icons/<имя>.webp` (нужны `pip install pillow numpy scipy`).
+- Фото товаров не генерируются: только настоящие снимки или фото производителя.
+
 ## Как подключить Telegram
 
 1. **Уведомления о заказах.** Создайте бота у @BotFather, добавьте его в группу менеджеров,

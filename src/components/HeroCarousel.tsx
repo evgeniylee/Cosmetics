@@ -1,26 +1,26 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getById, type L10n } from "@/data/catalog";
+import type { L10n } from "@/data/catalog";
 import { track } from "@/lib/analytics";
 import { useUi } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
-import { ProductVisual } from "./ProductVisual";
 import { TrackSection } from "./Section";
 
 type Slide = {
   id: string;
   tone: "light" | "dark";
   bg: string;
-  /** Фон-картинка (когда будут готовы изображения): /images/hero-*.webp */
+  /** Фон-картинка на весь слайд. Если есть, 3D-иконки не рисуются: объекты уже на фото. */
   image?: { desktop: string; mobile: string };
   eyebrow: L10n;
   title: L10n;
   text: L10n;
   cta: L10n;
   href: string;
-  products: string[];
+  /** 3D-иконки из /images/icons для правой части слайда */
+  art: string[];
 };
 
 const SLIDES: Slide[] = [
@@ -30,7 +30,8 @@ const SLIDES: Slide[] = [
     eyebrow: { ru: "Оригинальная корейская косметика", uz: "Original koreys kosmetikasi" },
     title: { ru: "Уход, который проверили до вас", uz: "Sizdan oldin tekshirilgan parvarish" },
     text: { ru: "Проверяем партию и срок годности, упаковываем как подарок и привозим завтра.", uz: "Partiya va muddatni tekshiramiz, sovg'a kabi qadoqlab ertaga yetkazamiz." },
-    cta: { ru: "Подобрать уход", uz: "Parvarish tanlash" }, href: "/quiz", products: ["2", "1", "5", "8"],
+    cta: { ru: "Подобрать уход", uz: "Parvarish tanlash" }, href: "/quiz", art: [],
+    image: { desktop: "/images/hero/hero-desktop.webp", mobile: "/images/hero/hero-mobile.webp" },
   },
   {
     id: "spf", tone: "light",
@@ -38,7 +39,7 @@ const SLIDES: Slide[] = [
     eyebrow: { ru: "Сезон SPF", uz: "SPF mavsumi" },
     title: { ru: "Санскрины без белых следов", uz: "Oq izsiz quyoshdan himoya" },
     text: { ru: "Лёгкие текстуры под макияж. Каждый день, даже в пасмурную погоду.", uz: "Makiyaj ostiga yengil teksturalar. Har kuni." },
-    cta: { ru: "Выбрать SPF", uz: "SPF tanlash" }, href: "/catalog?cat=spf", products: ["2", "10", "9"],
+    cta: { ru: "Выбрать SPF", uz: "SPF tanlash" }, href: "/catalog?cat=spf", art: ["spf", "essence"],
   },
   {
     id: "acne", tone: "dark",
@@ -46,7 +47,7 @@ const SLIDES: Slide[] = [
     eyebrow: { ru: "Против акне", uz: "Husnbuzarga qarshi" },
     title: { ru: "Чистая кожа без агрессии", uz: "Agressiyasiz toza teri" },
     text: { ru: "Кислотные тонеры, центелла и патчи, которые работают за одну ночь.", uz: "Kislotali tonerlar, sentella va bir kechada ishlaydigan patchlar." },
-    cta: { ru: "Смотреть подборку", uz: "To'plamni ko'rish" }, href: "/catalog?concern=acne", products: ["7", "6", "14"],
+    cta: { ru: "Смотреть подборку", uz: "To'plamni ko'rish" }, href: "/catalog?concern=acne", art: ["toner", "mask"],
   },
   {
     id: "creator", tone: "dark",
@@ -54,7 +55,7 @@ const SLIDES: Slide[] = [
     eyebrow: { ru: "Выбор креаторов", uz: "Kreatorlar tanlovi" },
     title: { ru: "−10% по коду MADINA", uz: "MADINA kodi bilan −10%" },
     text: { ru: "Любимый уход Мадины: эссенция, санскрин и крем с церамидами.", uz: "Madinaning sevimli parvarishi: essensiya, SPF va seramidli krem." },
-    cta: { ru: "Смотреть подборку", uz: "To'plamni ko'rish" }, href: "/catalog?creator=MADINA", products: ["1", "13", "5"],
+    cta: { ru: "Смотреть подборку", uz: "To'plamni ko'rish" }, href: "/catalog?creator=MADINA", art: ["serum", "cream"],
   },
   {
     id: "hydra", tone: "light",
@@ -62,28 +63,36 @@ const SLIDES: Slide[] = [
     eyebrow: { ru: "Увлажнение", uz: "Namlash" },
     title: { ru: "Кожа не тянет даже зимой", uz: "Qishda ham teri tortilmaydi" },
     text: { ru: "Гиалуроновые сыворотки, ночные маски и кремы с церамидами.", uz: "Gialuron zardoblari, tungi niqoblar va seramidli kremlar." },
-    cta: { ru: "Выбрать увлажнение", uz: "Namlashni tanlash" }, href: "/catalog?concern=dryness", products: ["5", "11", "13"],
+    cta: { ru: "Выбрать увлажнение", uz: "Namlashni tanlash" }, href: "/catalog?concern=dryness", art: ["essence", "cream", "serum"],
   },
 ];
 
 const DELAY = 5500;
 const SPEED = 800;
 
-function SlideArt({ ids, active }: { ids: string[]; active: boolean }) {
-  const pos = [
-    { l: "6%", t: "18%", r: "-8deg", d: "0s" },
-    { l: "30%", t: "0%", r: "5deg", d: "-1.5s" },
-    { l: "54%", t: "22%", r: "-4deg", d: "-3s" },
-    { l: "76%", t: "6%", r: "9deg", d: "-4.5s" },
-  ];
+// Раскладка 3D-иконок: две крупные или три поменьше, каждая слегка покачивается.
+const LAYOUTS: Record<number, { l: string; t: string; w: string; r: string; d: string }[]> = {
+  2: [
+    { l: "6%", t: "8%", w: "52%", r: "-6deg", d: "0s" },
+    { l: "48%", t: "26%", w: "44%", r: "7deg", d: "-2.5s" },
+  ],
+  3: [
+    { l: "2%", t: "18%", w: "40%", r: "-7deg", d: "0s" },
+    { l: "34%", t: "0%", w: "38%", r: "4deg", d: "-2s" },
+    { l: "62%", t: "30%", w: "36%", r: "8deg", d: "-4s" },
+  ],
+};
+
+function SlideArt({ icons, active }: { icons: string[]; active: boolean }) {
+  const layout = LAYOUTS[icons.length] ?? LAYOUTS[3];
   return (
     <div className={`relative h-full w-full ${active ? "hero-art-in" : "opacity-0"}`}>
-      {ids.map((id, i) => {
-        const p = getById(id)!;
-        const s = pos[i % pos.length];
+      {icons.map((name, i) => {
+        const s = layout[i % layout.length];
         return (
-          <div key={id} className="float absolute h-[78%] w-[26%]" style={{ left: s.l, top: s.t, ["--r" as string]: s.r, animationDelay: s.d }}>
-            <ProductVisual pack={p.pack} color={p.color} brand={p.brand} />
+          <div key={name} className="float absolute aspect-square" style={{ left: s.l, top: s.t, width: s.w, ["--r" as string]: s.r, animationDelay: s.d }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/images/icons/${name}.webp`} alt="" draggable={false} className="h-full w-full object-contain drop-shadow-[0_24px_30px_rgba(17,17,17,.18)]" />
           </div>
         );
       })}
@@ -202,7 +211,8 @@ export function HeroCarousel() {
                 {s.image && (
                   <picture>
                     <source media="(min-width: 768px)" srcSet={s.image.desktop} />
-                    <img src={s.image.mobile} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.image.mobile} alt="" fetchPriority={i === 1 ? "high" : "auto"} loading={i === 1 ? "eager" : "lazy"} className="absolute inset-0 h-full w-full object-cover object-[50%_40%] md:object-right" draggable={false} />
                   </picture>
                 )}
                 {/* декоративная сетка */}
@@ -224,8 +234,8 @@ export function HeroCarousel() {
                       {s.cta[lang]} <Icon name="arrowR" size={20} />
                     </Link>
                   </div>
-                  <div className="relative mx-auto h-[160px] w-full max-w-[420px] md:h-[400px] md:max-w-none">
-                    <SlideArt ids={s.products} active={active} />
+                  <div className="relative mx-auto h-[170px] w-full max-w-[300px] md:h-[440px] md:max-w-[520px]">
+                    {!s.image && <SlideArt icons={s.art} active={active} />}
                   </div>
                 </div>
               </div>

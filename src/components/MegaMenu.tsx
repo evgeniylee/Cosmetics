@@ -79,7 +79,15 @@ function SectionPanel({ s, onPick }: { s: MenuSection; onPick: () => void }) {
               <ul className="mt-3 space-y-1">
                 {c.links.map((l, i) => (
                   <li key={l.href} className="menu-item-in" style={{ animationDelay: `${i * 35}ms` }}>
-                    <Link href={`/${lang}${l.href}`} onClick={onPick} className="inline-block py-1.5 text-[16px] transition-colors hover:text-accent">{l.label[lang]}</Link>
+                    <Link href={`/${lang}${l.href}`} onClick={onPick} className="group/l inline-flex items-center gap-3 py-1.5 text-[16px] transition-colors hover:text-accent">
+                      {l.img && (
+                        <span className="grid size-10 place-items-center rounded-xl bg-surface transition-colors group-hover/l:bg-accent-soft">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={l.img} alt="" className="size-8 object-contain transition-transform duration-300 group-hover/l:-rotate-6 group-hover/l:scale-110" />
+                        </span>
+                      )}
+                      {l.label[lang]}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -91,8 +99,13 @@ function SectionPanel({ s, onPick }: { s: MenuSection; onPick: () => void }) {
         <div className="hidden space-y-4 lg:block">
           {s.promo.map((p) => (
             <Link key={p.href} href={`/${lang}${p.href}`} onClick={onPick} className="group block">
-              <span className="block aspect-[16/10] overflow-hidden rounded-card" style={{ background: p.tone }}>
-                <span className="block h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ background: "radial-gradient(60% 60% at 70% 40%, rgba(255,255,255,.7), transparent 70%)" }} />
+              <span className="relative block aspect-[16/10] overflow-hidden rounded-card" style={{ background: p.tone }}>
+                {p.image ? (
+                  <img src={p.image} alt="" className="h-full w-full object-cover object-right transition-transform duration-500 group-hover:scale-105" />
+                ) : p.icon ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={`/images/icons/${p.icon}.webp`} alt="" className="absolute right-[8%] top-1/2 h-[82%] -translate-y-1/2 object-contain transition-transform duration-500 group-hover:-rotate-6 group-hover:scale-105" />
+                ) : null}
               </span>
               <span className="mt-3 block text-[16px] font-bold">{p.title[lang]}</span>
               <span className="block text-[14px] text-ink/70">{p.text[lang]}</span>
@@ -215,8 +228,15 @@ function MobileMenu({ open, close }: { open: boolean; close: () => void }) {
                     <ul className="mt-1">
                       {c.links.map((l, i) => (
                         <li key={l.href} className="menu-item-in" style={{ animationDelay: `${i * 30}ms` }}>
-                          <Link href={`/${lang}${l.href}`} onClick={close} className="flex items-center justify-between border-b border-line py-3.5 text-[16px]">
-                            {l.label[lang]} <Icon name="chevron" size={18} className="text-ink/40" />
+                          <Link href={`/${lang}${l.href}`} onClick={close} className="flex items-center gap-3 border-b border-line py-2.5 text-[16px]">
+                            {l.img && (
+                              <span className="grid size-11 place-items-center rounded-xl bg-surface">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={l.img} alt="" className="size-9 object-contain" />
+                              </span>
+                            )}
+                            <span className="flex-1">{l.label[lang]}</span>
+                            <Icon name="chevron" size={18} className="text-ink/40" />
                           </Link>
                         </li>
                       ))}

@@ -18,9 +18,8 @@ export function QuickCategories() {
         {CATEGORIES.map((c, i) => (
           <Link key={c.id} href={`/${lang}/catalog?cat=${c.id}`} data-stagger style={{ "--i": i } as React.CSSProperties} className="group flex w-[84px] shrink-0 flex-col items-center gap-2 md:w-auto">
             <span className="grid aspect-square w-full place-items-center rounded-card bg-surface transition-colors duration-300 group-hover:bg-accent-soft">
-              <span className="cat-icon grid size-[58%] place-items-center rounded-[30%] bg-[linear-gradient(145deg,#ff9cc4,#e4467e_60%,#b92d65)] text-white shadow-[inset_0_2px_6px_rgba(255,255,255,.6),0_10px_20px_-8px_rgba(228,70,126,.6)]">
-                <Icon name={c.icon} size={26} />
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/images/icons/${c.id}.webp`} alt="" width={160} height={160} draggable={false} className="cat-icon size-[78%] object-contain drop-shadow-[0_10px_14px_rgba(228,70,126,.18)]" />
             </span>
             <span className="text-center text-[13px] leading-tight md:text-[15px]">{c.name[lang]}</span>
           </Link>

@@ -1,7 +1,7 @@
 import { BRANDS, CATEGORIES, CONCERNS, SKIN_TYPES, type L10n } from "./catalog";
 
 // Структура меню «Каталог». Ссылки строятся на страницу каталога с фильтрами.
-export type MenuLink = { label: L10n; href: string };
+export type MenuLink = { label: L10n; href: string; img?: string };
 export type MenuColumn = { title: L10n; links: MenuLink[] };
 export type MenuSection = {
   id: string;
@@ -10,7 +10,7 @@ export type MenuSection = {
   href: string;
   columns?: MenuColumn[];
   brands?: boolean;
-  promo?: { title: L10n; text: L10n; href: string; tone: string }[];
+  promo?: { title: L10n; text: L10n; href: string; tone: string; image?: string; icon?: string }[];
 };
 
 const cat = (id: string) => `/catalog?cat=${id}`;
@@ -35,15 +35,15 @@ export const MENU: MenuSection[] = [
     columns: [
       {
         title: { ru: "Базовый уход", uz: "Asosiy parvarish" },
-        links: CATEGORIES.filter((c) => ["clean", "toner", "cream", "spf"].includes(c.id)).map((c) => ({ label: c.name, href: cat(c.id) })),
+        links: CATEGORIES.filter((c) => ["clean", "toner", "cream", "spf"].includes(c.id)).map((c) => ({ label: c.name, href: cat(c.id), img: `/images/icons/${c.id}.webp` })),
       },
       {
         title: { ru: "Направленный уход", uz: "Maqsadli parvarish" },
-        links: CATEGORIES.filter((c) => ["essence", "serum", "mask"].includes(c.id)).map((c) => ({ label: c.name, href: cat(c.id) })),
+        links: CATEGORIES.filter((c) => ["essence", "serum", "mask"].includes(c.id)).map((c) => ({ label: c.name, href: cat(c.id), img: `/images/icons/${c.id}.webp` })),
       },
     ],
     promo: [
-      { title: { ru: "Подберём уход за 1 минуту", uz: "1 daqiqada parvarish" }, text: { ru: "6 вопросов о вашей коже", uz: "Teringiz haqida 6 savol" }, href: "/quiz", tone: "linear-gradient(150deg,#ffd9e8,#cdb8ef)" },
+      { title: { ru: "Подберём уход за 1 минуту", uz: "1 daqiqada parvarish" }, text: { ru: "6 вопросов о вашей коже", uz: "Teringiz haqida 6 savol" }, href: "/quiz", tone: "linear-gradient(150deg,#ffd9e8,#cdb8ef)", image: "/images/hero/hero-desktop.webp" },
     ],
   },
   {
@@ -55,7 +55,7 @@ export const MENU: MenuSection[] = [
       { title: { ru: "Проблема", uz: "Muammo" }, links: CONCERNS.map((c) => ({ label: c.name, href: `/catalog?concern=${c.id}` })) },
     ],
     promo: [
-      { title: { ru: "Против акне", uz: "Husnbuzarga qarshi" }, text: { ru: "Тонеры, патчи и сыворотки", uz: "Tonerlar, patchlar, zardoblar" }, href: "/catalog?concern=acne", tone: "linear-gradient(150deg,#d8f0dc,#9fd3b5)" },
+      { title: { ru: "Против акне", uz: "Husnbuzarga qarshi" }, text: { ru: "Тонеры, патчи и сыворотки", uz: "Tonerlar, patchlar, zardoblar" }, href: "/catalog?concern=acne", tone: "linear-gradient(150deg,#e9f6ec,#bfe3cb)", icon: "toner" },
     ],
   },
   {
@@ -65,7 +65,7 @@ export const MENU: MenuSection[] = [
     href: "/catalog",
     columns: [{ title: { ru: "Тип кожи", uz: "Teri turi" }, links: SKIN_TYPES.map((s) => ({ label: s.name, href: `/catalog?skin=${s.id}` })) }],
     promo: [
-      { title: { ru: "Для сухой кожи", uz: "Quruq teri uchun" }, text: { ru: "Увлажнение без плёнки", uz: "Plyonkasiz namlash" }, href: "/catalog?skin=dry", tone: "linear-gradient(150deg,#dbe8f7,#9dc3e2)" },
+      { title: { ru: "Для сухой кожи", uz: "Quruq teri uchun" }, text: { ru: "Увлажнение без плёнки", uz: "Plyonkasiz namlash" }, href: "/catalog?skin=dry", tone: "linear-gradient(150deg,#eaf2fb,#c7dcf2)", icon: "cream" },
     ],
   },
   { id: "brands", icon: "shield", label: { ru: "Бренды", uz: "Brendlar" }, href: "/catalog", brands: true },

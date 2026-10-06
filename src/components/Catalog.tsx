@@ -77,7 +77,13 @@ export function Catalog({ params }: { params: Params }) {
       <div className="-mt-[72px] rounded-b-[32px] bg-surface pb-8 pt-[88px] md:-mt-[160px] md:rounded-b-block md:pb-12 md:pt-[170px]">
         <div className="wrap">
           <nav className="text-[13px] text-muted"><Link href={`/${lang}`}>{t.home}</Link> / <span>{t.catalog}</span></nav>
-          <h1 className="h-section mt-3">{title}</h1>
+          <div className="flex items-end gap-4">
+            <h1 className="h-section mt-3 min-w-0 flex-1">{title}</h1>
+            {category && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img key={category.id} src={`/images/icons/${category.id}.webp`} alt="" className="anim-panel float -mb-2 size-20 shrink-0 object-contain drop-shadow-[0_14px_18px_rgba(228,70,126,.2)] md:-mb-6 md:size-40" style={{ ["--r" as string]: "-6deg" }} />
+            )}
+          </div>
           <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto">
             <Link href={`/${lang}/catalog`} className={`shrink-0 rounded-full px-4 py-2 text-[14px] ${!params.cat ? "bg-ink text-white" : "bg-white"}`}>{t.all}</Link>
             {CATEGORIES.map((c) => (
