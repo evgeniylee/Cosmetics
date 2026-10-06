@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import "../globals.css";
 import { isLang, LANGS } from "@/lib/i18n";
 import { I18nProvider } from "@/components/I18n";
-import { BottomNav, Header } from "@/components/Header";
+import { BottomNav, Header, HeaderSpacer } from "@/components/Header";
+import { MegaMenu } from "@/components/MegaMenu";
 import { Footer } from "@/components/Footer";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { AddedSheet } from "@/components/AddedSheet";
@@ -24,11 +25,16 @@ export default async function LangLayout({ children, params }: { children: React
   const { lang } = await params;
   if (!isLang(lang)) notFound();
   return (
-    <html lang={lang}>
+    <html lang={lang} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+      </head>
       <body>
         <I18nProvider lang={lang}>
           <Attribution />
           <Header />
+          <MegaMenu />
+          <HeaderSpacer />
           <main className="min-h-[60vh]">{children}</main>
           <Footer lang={lang} />
           <BottomNav />

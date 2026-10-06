@@ -65,13 +65,26 @@ export const useShop = create<ShopState>()(
   )
 );
 
-// UI-состояние без сохранения: шторка «Добавлено в корзину», поиск.
-type UiState = { addedId: string | null; setAdded: (id: string | null) => void; searchOpen: boolean; setSearch: (v: boolean) => void };
+// UI-состояние без сохранения: шторка «Добавлено в корзину», поиск, меню, тон текущего слайда.
+type UiState = {
+  addedId: string | null;
+  setAdded: (id: string | null) => void;
+  searchOpen: boolean;
+  setSearch: (v: boolean) => void;
+  menuOpen: boolean;
+  setMenu: (v: boolean) => void;
+  heroTone: "light" | "dark";
+  setHeroTone: (t: "light" | "dark") => void;
+};
 export const useUi = create<UiState>((set) => ({
   addedId: null,
   setAdded: (addedId) => set({ addedId }),
   searchOpen: false,
-  setSearch: (searchOpen) => set({ searchOpen }),
+  setSearch: (searchOpen) => set({ searchOpen, menuOpen: false }),
+  menuOpen: false,
+  setMenu: (menuOpen) => set({ menuOpen }),
+  heroTone: "light",
+  setHeroTone: (heroTone) => set({ heroTone }),
 }));
 
 /** true после гидратации persist, чтобы не было расхождения SSR и клиента. */

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useState } from "react";
 import type { Product } from "@/data/catalog";
 import { discountPct, money, unitPrice } from "@/lib/shop";
 import { track } from "@/lib/analytics";
@@ -24,15 +25,16 @@ export function FavButton({ id, className = "" }: { id: string; className?: stri
   const fav = useShop((s) => s.favorites.includes(id));
   const toggle = useShop((s) => s.toggleFav);
   const on = hydrated && fav;
+  const [pop, setPop] = useState(0);
   return (
     <button
       type="button"
       aria-label={t.favorites}
       aria-pressed={on}
-      onClick={(e) => { e.preventDefault(); toggle(id); if (!on) track("wishlist_add", { item_id: id }); }}
-      className={`grid size-9 place-items-center rounded-full transition hover:bg-white/70 ${on ? "text-accent" : "text-ink/45"} ${className}`}
+      onClick={(e) => { e.preventDefault(); toggle(id); if (!on) { track("wishlist_add", { item_id: id }); setPop((n) => n + 1); } }}
+      className={`grid size-9 place-items-center rounded-full transition hover:bg-white/70 active:scale-90 ${on ? "text-accent" : "text-ink/45"} ${className}`}
     >
-      <Icon name="heart" size={21} fill={on} />
+      <span key={pop} className={pop ? "heart-pop" : ""}><Icon name="heart" size={21} fill={on} /></span>
     </button>
   );
 }
@@ -70,7 +72,7 @@ export function PriceButton({ p, source, size = "md" }: { p: Product; source: st
 
   if (pct) {
     return (
-      <button type="button" onClick={onAdd} className={`group flex ${h} w-fit max-w-full items-center rounded-full bg-accent-soft pl-3 text-accent transition hover:brightness-95`}>
+      <button type="button" onClick={onAdd} className={`group flex ${h} w-fit max-w-full items-center rounded-full bg-accent-soft pl-3 text-accent transition hover:brightness-95 active:scale-95`}>
         <Icon name="bag" size={18} className="hidden shrink-0 min-[400px]:block" />
         <span className="whitespace-nowrap text-[14px] font-bold tabular min-[400px]:ml-1.5 md:text-[17px]">{money(p.price, lang)}</span>
         <span className="ml-1.5 hidden whitespace-nowrap text-[12px] text-accent/55 line-through tabular lg:inline">{money(p.oldPrice!, lang)}</span>
@@ -79,7 +81,7 @@ export function PriceButton({ p, source, size = "md" }: { p: Product; source: st
     );
   }
   return (
-    <button type="button" onClick={onAdd} className={`flex ${h} w-fit items-center gap-1.5 rounded-full bg-surface px-3.5 transition hover:bg-line`}>
+    <button type="button" onClick={onAdd} className={`flex ${h} w-fit items-center gap-1.5 rounded-full bg-surface px-3.5 transition hover:bg-ink hover:text-white active:scale-95`}>
       <Icon name="bag" size={18} />
       <span className="text-[15px] font-bold tabular md:text-[17px]">{money(p.price, lang)}</span>
     </button>

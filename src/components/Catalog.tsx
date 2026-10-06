@@ -74,7 +74,7 @@ export function Catalog({ params }: { params: Params }) {
 
   return (
     <div>
-      <div className="-mt-[76px] rounded-b-[32px] bg-surface pb-8 pt-[100px] md:-mt-[92px] md:rounded-b-block md:pb-12 md:pt-[130px]">
+      <div className="-mt-[72px] rounded-b-[32px] bg-surface pb-8 pt-[88px] md:-mt-[160px] md:rounded-b-block md:pb-12 md:pt-[170px]">
         <div className="wrap">
           <nav className="text-[13px] text-muted"><Link href={`/${lang}`}>{t.home}</Link> / <span>{t.catalog}</span></nav>
           <h1 className="h-section mt-3">{title}</h1>
@@ -153,7 +153,7 @@ export function Catalog({ params }: { params: Params }) {
 
       {/* Мобильные фильтры: bottom-sheet с живым счётчиком */}
       {sheet && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label={t.filters}>
+        <div className="fixed inset-0 z-[80] md:hidden" role="dialog" aria-modal="true" aria-label={t.filters}>
           <div className="absolute inset-0 bg-ink/30 anim-fade" onClick={() => setSheet(false)} />
           <div className="anim-sheet absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-panel bg-white">
             <div className="flex items-center justify-between border-b border-line p-4">

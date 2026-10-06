@@ -37,7 +37,7 @@ export function AddedSheet() {
   const upsell = PRODUCTS.filter((x) => x.id !== id && !cart[x.id]).sort((a, b) => a.price - b.price).slice(0, 3);
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={t.added}>
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label={t.added}>
       <div className="absolute inset-0 bg-ink/30 anim-fade" onClick={() => close(null)} />
       <div className="anim-sheet absolute inset-x-0 bottom-0 mx-auto max-w-[640px] rounded-t-panel bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom,0px))] md:bottom-6 md:rounded-panel">
         <div className="flex items-center gap-3">

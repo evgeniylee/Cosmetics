@@ -8,58 +8,17 @@ import { useHydrated, useShop } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { ProductCard } from "./ProductCard";
-import { ProductVisual } from "./ProductVisual";
 import { Rail, TrackSection } from "./Section";
-
-export function Hero() {
-  const { lang, t } = useI18n();
-  const show = ["2", "1", "5", "8"].map((id) => getById(id)!);
-  return (
-    <TrackSection id="hero" className="relative -mt-[76px] overflow-hidden rounded-b-[32px] bg-[radial-gradient(120%_90%_at_80%_20%,#ffd9e8_0%,#f7c3d8_35%,#e7b7e0_70%,#cdb8ef_100%)] pb-36 pt-[100px] md:-mt-[92px] md:rounded-b-block md:pb-44 md:pt-[130px]">
-      {/* декоративная сетка тонких линий */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-x-0 top-[62%] h-px bg-white/60" />
-        <div className="absolute inset-y-0 left-1/2 hidden w-px bg-white/60 md:block" />
-      </div>
-      <div className="wrap relative grid items-center gap-8 md:grid-cols-2">
-        <div className="max-w-[560px]">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-ink/60">{t.heroEyebrow}</p>
-          <h1 className="mt-3 text-[34px] font-bold leading-[1.02] tracking-[-0.02em] text-balance md:text-[58px]">{t.heroTitle}</h1>
-          <p className="mt-4 max-w-[46ch] text-[15px] text-ink/75 md:text-[18px]">{t.heroText}</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href={`/${lang}/quiz`} className="flex h-14 items-center gap-2 rounded-card bg-accent px-6 text-[16px] font-semibold text-white shadow-float hover:bg-accent-dark md:h-[64px] md:text-[18px]">
-              {t.heroCta} <Icon name="arrowR" size={20} />
-            </Link>
-            <a href="#hits" className="flex h-14 items-center rounded-card bg-white/80 px-6 text-[16px] font-semibold backdrop-blur hover:bg-white md:h-[64px]">
-              {t.heroCta2}
-            </a>
-          </div>
-        </div>
-        <div className="relative hidden h-[360px] md:block">
-          {show.map((p, i) => (
-            <div
-              key={p.id}
-              className="absolute h-[300px] w-[200px]"
-              style={{ left: `${8 + i * 21}%`, top: `${[30, 0, 40, 10][i]}px`, transform: `rotate(${[-8, 4, -3, 9][i]}deg)` }}
-            >
-              <ProductVisual pack={p.pack} color={p.color} brand={p.brand} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </TrackSection>
-  );
-}
 
 export function QuickCategories() {
   const { lang } = useI18n();
   return (
     <TrackSection id="quick_categories" className="wrap relative z-10 -mt-24 md:-mt-28">
       <div className="no-scrollbar flex gap-3 overflow-x-auto rounded-panel bg-white p-4 shadow-float md:grid md:grid-cols-7 md:gap-6 md:rounded-[40px] md:p-6">
-        {CATEGORIES.map((c) => (
-          <Link key={c.id} href={`/${lang}/catalog?cat=${c.id}`} className="group flex w-[84px] shrink-0 flex-col items-center gap-2 md:w-auto">
-            <span className="grid aspect-square w-full place-items-center rounded-card bg-surface transition group-hover:bg-accent-soft">
-              <span className="grid size-[58%] place-items-center rounded-[30%] bg-[linear-gradient(145deg,#ff9cc4,#e4467e_60%,#b92d65)] text-white shadow-[inset_0_2px_6px_rgba(255,255,255,.6),0_10px_20px_-8px_rgba(228,70,126,.6)]">
+        {CATEGORIES.map((c, i) => (
+          <Link key={c.id} href={`/${lang}/catalog?cat=${c.id}`} data-stagger style={{ "--i": i } as React.CSSProperties} className="group flex w-[84px] shrink-0 flex-col items-center gap-2 md:w-auto">
+            <span className="grid aspect-square w-full place-items-center rounded-card bg-surface transition-colors duration-300 group-hover:bg-accent-soft">
+              <span className="cat-icon grid size-[58%] place-items-center rounded-[30%] bg-[linear-gradient(145deg,#ff9cc4,#e4467e_60%,#b92d65)] text-white shadow-[inset_0_2px_6px_rgba(255,255,255,.6),0_10px_20px_-8px_rgba(228,70,126,.6)]">
                 <Icon name={c.icon} size={26} />
               </span>
             </span>
@@ -209,7 +168,7 @@ export function Trust() {
       <h2 className="h-section mb-5 md:mb-8">{t.trustTitle}</h2>
       <ol className="grid gap-3 md:grid-cols-3 md:gap-6">
         {items.map((it, i) => (
-          <li key={it.title} className="flex gap-4 rounded-panel bg-surface p-5 md:flex-col md:p-8">
+          <li key={it.title} data-stagger style={{ "--i": i } as React.CSSProperties} className="flex gap-4 rounded-panel bg-surface p-5 transition-transform duration-300 hover:-translate-y-1 md:flex-col md:p-8">
             <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white text-accent md:size-14">
               <Icon name={it.icon} size={26} />
             </span>
@@ -232,8 +191,8 @@ export function Brands() {
     <TrackSection id="brands" className="wrap mt-14 md:mt-24">
       <h2 className="h-section mb-5 md:mb-8">{t.brandsTitle}</h2>
       <div className="no-scrollbar flex gap-3 overflow-x-auto md:grid md:grid-cols-6 md:gap-5">
-        {brands.map((b) => (
-          <Link key={b} href={`/${lang}/catalog?brand=${encodeURIComponent(b)}`} className="grid h-20 w-40 shrink-0 place-items-center rounded-card bg-surface px-3 text-center text-[16px] font-bold uppercase tracking-[0.12em] hover:bg-accent-soft md:h-[106px] md:w-auto md:text-[18px]">
+        {brands.map((b, i) => (
+          <Link key={b} data-stagger style={{ "--i": Math.min(i, 8) } as React.CSSProperties} href={`/${lang}/catalog?brand=${encodeURIComponent(b)}`} className="grid h-20 w-40 shrink-0 place-items-center rounded-card bg-surface px-3 text-center text-[16px] font-bold uppercase tracking-[0.12em] hover:bg-accent-soft md:h-[106px] md:w-auto md:text-[18px]">
             {b}
           </Link>
         ))}

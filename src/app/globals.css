@@ -109,3 +109,48 @@ body {
 .anim-sheet { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .anim-fade { animation: fade-in 0.2s ease-out; }
 .anim-bump { animation: bump 0.35s ease-out; }
+
+/* ---- Меню ---- */
+@keyframes panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes item-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes slide-back { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+.anim-panel { animation: panel-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.menu-item-in { animation: item-in 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-slide-in { animation: slide-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-slide-back { animation: slide-back 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* ---- Появление блоков при прокрутке ----
+   Блоки скрыты только если JS уже работает (класс js на <html>), иначе видны сразу. */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.js [data-reveal].is-in { opacity: 1; transform: none; }
+.js [data-reveal] [data-stagger] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 70ms + 120ms);
+}
+.js [data-reveal].is-in [data-stagger] { opacity: 1; transform: none; }
+
+/* ---- Карусель ---- */
+@keyframes hero-text { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+@keyframes hero-art { from { opacity: 0; transform: translateY(30px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); } 50% { transform: translateY(-10px) rotate(var(--r, 0deg)); } }
+.hero-in > * { animation: hero-text 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.hero-in > *:nth-child(2) { animation-delay: 0.08s; }
+.hero-in > *:nth-child(3) { animation-delay: 0.16s; }
+.hero-in > *:nth-child(4) { animation-delay: 0.24s; }
+.hero-art-in { animation: hero-art 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s both; }
+.float { animation: float 6s ease-in-out infinite; }
+@keyframes dot-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---- Иконки категорий ---- */
+.cat-icon { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.group:hover .cat-icon { transform: translateY(-6px) rotate(-6deg) scale(1.06); }
+
+@keyframes heart-pop { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 70% { transform: scale(0.9); } 100% { transform: scale(1); } }
+.heart-pop { animation: heart-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }

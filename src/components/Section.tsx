@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import { track } from "@/lib/analytics";
 import { Icon } from "./Icon";
 
-/** Секция главной: шлёт section_view, когда блок на ≥50% в экране, и section_click при клике внутри. */
-export function TrackSection({ id, className = "", children }: { id: string; className?: string; children: React.ReactNode }) {
+/** Секция главной: шлёт section_view, когда блок на ≥50% в экране, и section_click при клике внутри.
+ *  С reveal (по умолчанию) плавно появляется при прокрутке. */
+export function TrackSection({ id, className = "", children, reveal = true }: { id: string; className?: string; children: React.ReactNode; reveal?: boolean }) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -22,12 +23,26 @@ export function TrackSection({ id, className = "", children }: { id: string; cla
       { threshold: 0.5 }
     );
     io.observe(el);
-    return () => io.disconnect();
-  }, [id]);
+    let ro: IntersectionObserver | null = null;
+    if (reveal) {
+      ro = new IntersectionObserver(
+        ([e]) => {
+          if (e.isIntersecting) {
+            el.classList.add("is-in");
+            ro?.disconnect();
+          }
+        },
+        { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+      );
+      ro.observe(el);
+    }
+    return () => { io.disconnect(); ro?.disconnect(); };
+  }, [id, reveal]);
   return (
     <section
       ref={ref}
       data-section={id}
+      data-reveal={reveal ? "" : undefined}
       className={className}
       onClickCapture={(e) => {
         if ((e.target as HTMLElement).closest("a,button")) track("section_click", { section_id: id });
@@ -70,7 +85,7 @@ export function Rail({ title, href, allLabel, children, itemClass = "w-[46%] sm:
       <SectionHeader title={title} href={href} allLabel={allLabel} onPrev={() => scroll(-1)} onNext={() => scroll(1)} />
       <div ref={ref} className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 md:-mx-[50px] md:scroll-px-[50px] md:gap-[30px] md:px-[50px]">
         {children.map((c, i) => (
-          <div key={i} className={`shrink-0 snap-start ${itemClass}`}>{c}</div>
+          <div key={i} data-stagger style={{ "--i": Math.min(i, 5) } as React.CSSProperties} className={`shrink-0 snap-start ${itemClass}`}>{c}</div>
         ))}
       </div>
     </div>

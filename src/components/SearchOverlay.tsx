@@ -51,7 +51,7 @@ export function SearchOverlay() {
   const close = () => { setOpen(false); setQ(""); };
 
   return (
-    <div className="fixed inset-0 z-50 anim-fade" role="dialog" aria-modal="true" aria-label={t.searchPh}>
+    <div className="fixed inset-0 z-[80] anim-fade" role="dialog" aria-modal="true" aria-label={t.searchPh}>
       <div className="absolute inset-0 bg-ink/30" onClick={close} />
       <div className="relative mx-auto max-h-[100dvh] max-w-[860px] overflow-y-auto bg-white pb-6 md:mt-4 md:rounded-panel md:shadow-float">
         <form
