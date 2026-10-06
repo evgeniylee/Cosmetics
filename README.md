@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NABI — интернет-магазин корейской косметики
 
-## Getting Started
+Next.js 15 (App Router) + Tailwind CSS 4 + TypeScript. Языки RU/UZ, mobile-first.
+Полное ТЗ: `docs/prompt.md`.
 
-First, run the development server:
+## Запуск
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000 → /ru
+npm run build && npm start   # продакшн-сборка
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Что готово (этап 1, демо-данные)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Дизайн-система: токены в `src/app/globals.css` (цвета, радиусы, шрифт Onest, self-hosted).
+- Шапка с поиском, нижний таб-бар на мобиле, переключатель RU/UZ.
+- Поиск с транслитом и опечатками (`kosrx` → COSRX), поиск по проблеме кожи (`от прыщей`, `husnbuzar`).
+- Главная: hero, быстрые категории, «Продолжить покупки», хиты, подбор ухода, выбор креаторов с промокодом, обзоры, «Почему нам доверяют», бренды, подписка, SEO.
+- Каталог: категории, фильтры (тип кожи, проблема, бренд), сортировка, bottom-sheet на мобиле с живым счётчиком.
+- Страница товара: цена за мл, обещание доставки с таймером до 18:00, «Купить в 1 клик», «Для кого», «Почему мы его любим», «Часто покупают вместе», отзывы с распределением, вопросы, сравнение, похожие, липкая панель покупки.
+- Корзина: прогресс до бесплатной доставки, промокоды креаторов (MADINA, SEVARA), скидки не суммируются, 2 пробника в подарок от 300 000 сум.
+- Оформление: телефон → код из Telegram (демо-код `111111`) → имя, фамилия, дата рождения, согласия → доставка и оплата. Вернувшийся клиент сразу попадает на доставку.
+- Аналитика: `src/lib/analytics.ts`, единая `track()`, события из раздела 4 ТЗ, `section_view`/`section_click` по блокам главной, сохранение UTM и `ref`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Где что лежит
 
-## Learn More
+| Путь | Что |
+|---|---|
+| `src/data/catalog.ts` | демо-каталог, категории, типы кожи, проблемы |
+| `src/lib/i18n.ts` | все тексты RU/UZ |
+| `src/lib/shop.ts` | цены, доставка, промокоды |
+| `src/lib/search.ts` | поиск с транслитом |
+| `src/store/shop.ts` | корзина, избранное, клиент (пока в localStorage) |
+| `src/components/` | UI-компоненты |
 
-To learn more about Next.js, take a look at the following resources:
+## Следующие этапы
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. База данных (PostgreSQL) и API заказов вместо localStorage.
+2. Вход через Telegram Gateway (нужен токен) и база клиентов с анкетой (раздел 2.13 ТЗ).
+3. Админка: товары, заказы, клиенты, загрузка каталога из Excel.
+4. Telegram-бот: статусы заказов, напоминания о повторе, брошенная корзина.
+5. Квиз подбора ухода, кабинет креатора.
+6. Яндекс Метрика + PostHog, деплой.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Переменные окружения
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+См. `.env.example`.

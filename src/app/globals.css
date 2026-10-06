@@ -1,26 +1,111 @@
 @import "tailwindcss";
+@import "@fontsource-variable/onest";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Дизайн-токены NABI. Меняются здесь, компоненты берут их через классы Tailwind. */
+@theme {
+  --color-ink: #111111;
+  --color-muted: #8b9296;
+  --color-line: #e8e7ec;
+  --color-surface: #f7f6f9;
+  --color-accent: #e4467e;
+  --color-accent-dark: #c9306a;
+  --color-accent-soft: #fbe6ef;
+  --color-hit: #aa98ce;
+  --color-success: #3f9a33;
+  --color-warn: #c2581f;
+
+  --font-sans: "Onest Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-sm: 6px;
+  --radius-card: 20px;
+  --radius-panel: 30px;
+  --radius-block: 50px;
+
+  --shadow-float: 0 12px 40px rgba(17, 17, 17, 0.08);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@utility wrap {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1440px;
+  padding-inline: 16px;
+  @media (width >= 768px) {
+    padding-inline: 50px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@utility h-section {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-size: 30px;
+  text-wrap: balance;
+  @media (width >= 768px) {
+    font-size: 48px;
+  }
+  @media (width >= 1200px) {
+    font-size: 62px;
+  }
 }
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+/* Страховка от горизонтального скролла страницы; clip не ломает sticky, в отличие от hidden. */
+html,
+body {
+  overflow-x: clip;
+}
+body {
+  background: #fff;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes bump {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+}
+.anim-sheet { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.anim-fade { animation: fade-in 0.2s ease-out; }
+.anim-bump { animation: bump 0.35s ease-out; }
