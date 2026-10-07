@@ -1,4 +1,4 @@
-import { BRANDS, CATEGORIES, CONCERNS, SKIN_TYPES, type L10n } from "./catalog";
+import { CATEGORIES, CONCERNS, SKIN_TYPES, type L10n } from "./catalog";
 
 // Структура меню «Каталог». Ссылки строятся на страницу каталога с фильтрами.
 export type MenuLink = { label: L10n; href: string; img?: string };
@@ -74,4 +74,3 @@ export const MENU: MenuSection[] = [
   { id: "creators", icon: "heart", label: { ru: "Выбор креаторов", uz: "Kreatorlar tanlovi" }, href: "/catalog?creator=MADINA" },
 ];
 
-export const POPULAR_BRANDS = BRANDS;

@@ -1,4 +1,5 @@
-// Демо-каталог. Цены и тексты примерные; заменяются загрузкой из админки/Excel.
+// Справочники (категории, типы кожи, проблемы) и демо-товары для первого заполнения базы.
+// Рабочий каталог хранится в базе и редактируется в админке; на витрине он доступен через useCatalog().
 export type Lang = "ru" | "uz";
 export type L10n = { ru: string; uz: string };
 
@@ -17,7 +18,7 @@ export type Product = {
   skin: SkinType[];
   concerns: Concern[];
   volume: number; // мл или шт.
-  unit: "ml" | "pcs";
+  unit: "ml" | "pcs" | "g";
   price: number;
   oldPrice?: number;
   rating: number;
@@ -33,6 +34,8 @@ export type Product = {
   ingredients: L10n[];
   reviewSummary?: L10n;
   fbt: string[];
+  images?: string[];
+  stock?: "in_stock" | "on_order" | "out";
 };
 
 export const CATEGORIES: { id: CategoryId; name: L10n; icon: string }[] = [
@@ -65,7 +68,8 @@ export const CONCERNS: { id: Concern; name: L10n }[] = [
 
 const P = (p: Product) => p;
 
-export const PRODUCTS: Product[] = [
+/** Демо-товары: попадают в базу только при первом запуске, если таблица товаров пуста. */
+export const SEED_PRODUCTS: Product[] = [
   P({ id: "1", slug: "cosrx-snail-96-mucin-essence", brand: "COSRX", name: "Advanced Snail 96 Mucin Power Essence", type: { ru: "Эссенция для лица", uz: "Yuz uchun essensiya" }, cat: "essence", skin: ["dry", "sens", "combo", "normal"], concerns: ["dryness", "redness"], volume: 100, unit: "ml", price: 215000, rating: 4.8, reviews: 126, color: "#E6DCCB", pack: "pump", badge: "hit", rank: { ru: "#1 в эссенциях", uz: "Essensiyalarda #1" }, daysSupply: 75,
     desc: { ru: "Эссенция с 96% муцина улитки. Глубоко увлажняет, помогает коже восстановиться после воспалений и раздражения.", uz: "96% shilliq qurt mutsini bilan essensiya. Chuqur namlaydi, terining tiklanishiga yordam beradi." },
     why: { ru: "Самый понятный первый шаг в корейском уходе: подходит почти всем и сразу даёт ощущение увлажнённой кожи.", uz: "Koreys parvarishidagi eng oddiy birinchi qadam: deyarli hammaga mos keladi." },
@@ -161,6 +165,5 @@ export const SAMPLES: { id: string; name: L10n }[] = [
   { id: "s4", name: { ru: "Пробник крема Illiyoon", uz: "Illiyoon kremi namunasi" } },
 ];
 
-export const getProduct = (slug: string) => PRODUCTS.find((p) => p.slug === slug);
-export const getById = (id: string) => PRODUCTS.find((p) => p.id === id);
-export const BRANDS = Array.from(new Set(PRODUCTS.map((p) => p.brand))).sort();
+export const UNITS = { ml: { ru: "мл", uz: "ml" }, pcs: { ru: "шт", uz: "dona" }, g: { ru: "г", uz: "g" } } as const;
+export const PACKS: Pack[] = ["bottle", "tube", "jar", "pump", "dropper"];

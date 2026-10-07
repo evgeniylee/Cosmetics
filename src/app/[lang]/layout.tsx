@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import "../globals.css";
-import { isLang, LANGS } from "@/lib/i18n";
+import { isLang } from "@/lib/i18n";
 import { I18nProvider } from "@/components/I18n";
 import { BottomNav, Header, HeaderSpacer } from "@/components/Header";
 import { MegaMenu } from "@/components/MegaMenu";
@@ -9,6 +9,8 @@ import { Footer } from "@/components/Footer";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { AddedSheet } from "@/components/AddedSheet";
 import { Attribution } from "@/components/Attribution";
+import { CatalogProvider } from "@/components/CatalogProvider";
+import { getPublicCatalog } from "@/server/catalog";
 
 export const metadata: Metadata = {
   title: { default: "NABI — оригинальная корейская косметика в Узбекистане", template: "%s · NABI" },
@@ -17,13 +19,13 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" };
 
-export function generateStaticParams() {
-  return LANGS.map((lang) => ({ lang }));
-}
+// Каталог берётся из базы на каждый запрос (из кэша в памяти), поэтому страницы динамические.
+export const dynamic = "force-dynamic";
 
 export default async function LangLayout({ children, params }: { children: React.ReactNode; params: Promise<{ lang: string }> }) {
   const { lang } = await params;
   if (!isLang(lang)) notFound();
+  const catalog = await getPublicCatalog();
   return (
     <html lang={lang} suppressHydrationWarning>
       <head>
@@ -31,6 +33,7 @@ export default async function LangLayout({ children, params }: { children: React
       </head>
       <body>
         <I18nProvider lang={lang}>
+          <CatalogProvider value={catalog}>
           <Attribution />
           <Header />
           <MegaMenu />
@@ -40,6 +43,7 @@ export default async function LangLayout({ children, params }: { children: React
           <BottomNav />
           <SearchOverlay />
           <AddedSheet />
+          </CatalogProvider>
         </I18nProvider>
       </body>
     </html>

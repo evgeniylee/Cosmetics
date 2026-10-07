@@ -7,7 +7,7 @@ import { track } from "@/lib/analytics";
 import { useHydrated, useShop, useUi } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
-import { ProductVisual } from "./ProductVisual";
+import { ProductImage } from "./ProductVisual";
 
 export function Badge({ p }: { p: Product }) {
   const { t } = useI18n();
@@ -106,8 +106,8 @@ export function ProductCard({ p, source }: { p: Product; source: string }) {
         onClick={() => track("select_item", { item_id: p.id, source })}
         className="group relative block aspect-square overflow-hidden rounded-card bg-surface"
       >
-        <div className="h-full w-full transition duration-300 group-hover:scale-[1.04]">
-          <ProductVisual pack={p.pack} color={p.color} brand={p.brand} />
+        <div className="h-full w-full p-[7%] transition duration-300 group-hover:scale-[1.04]">
+          <ProductImage p={p} />
         </div>
         <Badge p={p} />
         <FavButton id={p.id} className="absolute right-2 top-2" />

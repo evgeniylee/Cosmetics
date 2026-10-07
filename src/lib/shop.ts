@@ -61,15 +61,12 @@ export function fmtCountdown(ms: number, lang: Lang) {
   return lang === "uz" ? `${h} soat ${m} daq` : `${h} ч ${m} мин`;
 }
 
-// ---- Промокоды (демо). В рабочей версии проверяются на сервере. ----
-export const CREATOR_CODES: Record<string, { name: string; handle: string; pct: number }> = {
-  MADINA: { name: "Мадина", handle: "@madina.skincare", pct: 10 },
-  SEVARA: { name: "Севара", handle: "@sevara.tt", pct: 10 },
-};
+// ---- Промокоды: проверяются на сервере (/api/promo), здесь только расчёт ----
+export type Promo = { code: string; percent: number };
 
-export function bestDiscount(subtotal: number, code: string | null) {
-  // Скидки не суммируются: выбираем максимальную из доступных.
+/** Скидки не суммируются: выбираем максимальную из доступных. Процент кода приходит из базы. */
+export function bestDiscount(subtotal: number, promo: Promo | null) {
   const options: { source: string; amount: number }[] = [];
-  if (code && CREATOR_CODES[code]) options.push({ source: code, amount: Math.round((subtotal * CREATOR_CODES[code].pct) / 100 / 1000) * 1000 });
+  if (promo) options.push({ source: promo.code, amount: Math.round((subtotal * promo.percent) / 100 / 1000) * 1000 });
   return options.sort((a, b) => b.amount - a.amount)[0] ?? null;
 }

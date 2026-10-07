@@ -3,10 +3,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import type { ApiCustomer } from "@/lib/api";
+import type { Promo } from "@/lib/shop";
 
 type ShopState = {
   cart: Record<string, number>;
-  promo: string | null;
+  promo: Promo | null;
   samples: string[];
   city: string;
   favorites: string[];
@@ -16,7 +17,7 @@ type ShopState = {
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clearCart: () => void;
-  setPromo: (c: string | null) => void;
+  setPromo: (c: Promo | null) => void;
   toggleSample: (id: string) => void;
   setCity: (c: string) => void;
   toggleFav: (id: string) => void;
@@ -54,6 +55,13 @@ export const useShop = create<ShopState>()(
     }),
     {
       name: "nabi-shop",
+      version: 2,
+      // v1 хранил промокод строкой: сбрасываем, процент теперь приходит с сервера.
+      migrate: (state, version) => {
+        const s = state as Record<string, unknown>;
+        if (version < 2) s.promo = null;
+        return s as never;
+      },
       // Клиент больше не хранится в браузере: источник правды — сессия на сервере.
       partialize: ({ cart, promo, samples, city, favorites, recent, recentQueries }) => ({ cart, promo, samples, city, favorites, recent, recentQueries }),
     }

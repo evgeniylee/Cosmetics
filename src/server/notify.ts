@@ -30,6 +30,7 @@ export async function notifyAdmin(html: string) {
 const fmt = (n: number) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " сум";
 
 export function orderMessage(o: {
+  id?: string;
   number: string;
   status: string;
   name: string;
@@ -62,6 +63,8 @@ export function orderMessage(o: {
     o.discount ? `Скидка ${esc(o.discountSource || "")}: −${fmt(o.discount)}` : null,
     `Доставка: ${o.delivery ? fmt(o.delivery) : "бесплатно"}`,
     `<b>Итого: ${fmt(o.total)}</b> · ${pay}`,
+    // Ссылка на заказ в админке, если задан адрес сайта.
+    o.id && process.env.SITE_URL ? `\n<a href="${process.env.SITE_URL.replace(/\/$/, "")}/admin/orders/${o.id}">Открыть в админке →</a>` : null,
   ];
   return lines.filter((l) => l !== null).join("\n");
 }

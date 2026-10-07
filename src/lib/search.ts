@@ -1,4 +1,4 @@
-import { CATEGORIES, CONCERNS, PRODUCTS, type CategoryId, type Concern, type Product } from "@/data/catalog";
+import { CATEGORIES, CONCERNS, type CategoryId, type Concern, type Product } from "@/data/catalog";
 
 const CYR: Record<string, string> = {
   а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "j", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m",
@@ -57,7 +57,7 @@ const has = (q: string, words: string[]) => words.some((w) => q.includes(norm(w)
 
 export type SearchResult = { products: Product[]; categories: CategoryId[]; concerns: Concern[] };
 
-export function search(raw: string): SearchResult {
+export function search(raw: string, products: Product[]): SearchResult {
   const q = norm(raw);
   if (q.length < 2) return { products: [], categories: [], concerns: [] };
   const tokens = q.split(" ").filter((t) => t.length > 1);
@@ -65,7 +65,7 @@ export function search(raw: string): SearchResult {
   const concerns = (Object.keys(CONCERN_WORDS) as Concern[]).filter((c) => has(q, CONCERN_WORDS[c]));
   const categories = (Object.keys(CAT_WORDS) as CategoryId[]).filter((c) => has(q, CAT_WORDS[c]));
 
-  const scored = PRODUCTS.map((p) => {
+  const scored = products.map((p) => {
     const brand = norm(p.brand).replace(/ /g, "");
     const hay = norm(`${p.brand} ${p.name} ${p.type.ru} ${p.type.uz}`);
     const words = hay.split(" ");

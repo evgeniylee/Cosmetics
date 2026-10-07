@@ -9,7 +9,7 @@ import { useSession, useShop } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { PromoField, Summary } from "./Cart";
-import { ProductVisual } from "./ProductVisual";
+import { ProductImage } from "./ProductVisual";
 
 // ---- Телефон: +998 XX XXX XX XX ----
 const digitsOf = (v: string) => v.replace(/\D/g, "").replace(/^998/, "").slice(0, 9);
@@ -238,7 +238,7 @@ export function Checkout() {
     try {
       const r = await api.createOrder({
         items: totals.lines.map((l) => ({ id: l.p.id, qty: l.qty })),
-        promo,
+        promo: promo?.code ?? null,
         city: totals.city,
         address: address.trim(),
         comment: comment.trim() || undefined,
@@ -410,7 +410,7 @@ export function Checkout() {
             <ul className="space-y-3">
               {totals.lines.map(({ p, qty }) => (
                 <li key={p.id} className="flex items-center gap-3 text-[14px]">
-                  <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductVisual pack={p.pack} color={p.color} /></span>
+                  <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductImage p={p} brand={false} /></span>
                   <span className="min-w-0 flex-1 truncate">{p.brand} {p.name}</span>
                   <span className="text-muted tabular">×{qty}</span>
                 </li>

@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { CONCERNS, PRODUCTS, SKIN_TYPES, getById, type Product } from "@/data/catalog";
+import { CONCERNS, SKIN_TYPES, type Product } from "@/data/catalog";
+import { useCatalog } from "./CatalogProvider";
 import { catName } from "@/lib/search";
 import { fmtCountdown, money, msToCutoff, unitPrice, volumeLabel } from "@/lib/shop";
 import { track } from "@/lib/analytics";
@@ -10,7 +11,7 @@ import { useHydrated, useShop, useUi } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { Badge, FavButton, PriceButton, ProductCard, Stars } from "./ProductCard";
-import { ProductVisual } from "./ProductVisual";
+import { ProductImage } from "./ProductVisual";
 import { Rail } from "./Section";
 
 function DeliveryPromise() {
@@ -49,7 +50,8 @@ function FrequentlyBought({ p }: { p: Product }) {
   const { lang, t } = useI18n();
   const add = useShop((s) => s.add);
   const setAdded = useUi((s) => s.setAdded);
-  const items = [p, ...p.fbt.map((id) => getById(id)!).filter(Boolean)];
+  const { byId } = useCatalog();
+  const items = [p, ...p.fbt.map((id) => byId(id)!).filter(Boolean)];
   const [sel, setSel] = useState<string[]>(items.map((i) => i.id));
   const total = items.filter((i) => sel.includes(i.id)).reduce((a, i) => a + i.price, 0);
   return (
@@ -66,7 +68,7 @@ function FrequentlyBought({ p }: { p: Product }) {
               className="size-5 accent-[var(--color-accent)]"
             />
             <label htmlFor={`fbt-${i.id}`} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-              <span className="size-14 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductVisual pack={i.pack} color={i.color} /></span>
+              <span className="size-14 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductImage p={i} brand={false} /></span>
               <span className="min-w-0 flex-1 text-[14px] leading-snug">{i.brand} {i.name}</span>
               <span className="shrink-0 font-semibold tabular">{money(i.price, lang)}</span>
             </label>
@@ -103,6 +105,8 @@ export function ProductDetail({ p }: { p: Product }) {
   const router = useRouter();
   const viewed = useShop((s) => s.viewed);
   const add = useShop((s) => s.add);
+  const { products } = useCatalog();
+  const [shot, setShot] = useState(0);
   const buyRef = useRef<HTMLDivElement>(null);
   const [sticky, setSticky] = useState(false);
 
@@ -119,8 +123,8 @@ export function ProductDetail({ p }: { p: Product }) {
     return () => io.disconnect();
   }, []);
 
-  const similar = PRODUCTS.filter((x) => x.id !== p.id && (x.cat === p.cat || x.concerns.some((c) => p.concerns.includes(c)))).slice(0, 8);
-  const compare = [p, ...PRODUCTS.filter((x) => x.id !== p.id && x.cat === p.cat).slice(0, 2)];
+  const similar = products.filter((x) => x.id !== p.id && (x.cat === p.cat || x.concerns.some((c) => p.concerns.includes(c)))).slice(0, 8);
+  const compare = [p, ...products.filter((x) => x.id !== p.id && x.cat === p.cat).slice(0, 2)];
   const dist = [5, 4, 3, 2, 1].map((s) => ({ s, pct: s === 5 ? 78 : s === 4 ? 15 : s === 3 ? 5 : 1 }));
 
   const buyNow = () => {
@@ -139,16 +143,18 @@ export function ProductDetail({ p }: { p: Product }) {
         {/* Галерея */}
         <div className="md:sticky md:top-28 md:self-start">
           <div className="relative aspect-square overflow-hidden rounded-panel bg-surface">
-            <ProductVisual pack={p.pack} color={p.color} brand={p.brand} />
+            <div key={shot} className="anim-fade h-full w-full p-[6%]"><ProductImage p={p} index={shot} /></div>
             <Badge p={p} />
           </div>
-          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
-            {[0, 1, 2, 3].map((i) => (
-              <span key={i} className={`size-[72px] shrink-0 overflow-hidden rounded-2xl bg-surface ${i === 0 ? "ring-2 ring-accent" : ""}`} style={i ? { background: `color-mix(in oklab, ${p.color} ${20 + i * 15}%, white)` } : undefined}>
-                {i === 0 && <ProductVisual pack={p.pack} color={p.color} />}
-              </span>
-            ))}
-          </div>
+          {(p.images?.length ?? 0) > 1 && (
+            <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
+              {p.images!.map((src, i) => (
+                <button key={src} type="button" onClick={() => { setShot(i); track("gallery_swipe", { item_id: p.id, index: i }); }} aria-label={`${i + 1}`} className={`size-[72px] shrink-0 overflow-hidden rounded-2xl bg-surface p-1.5 transition ${i === shot ? "ring-2 ring-accent" : "opacity-80 hover:opacity-100"}`}>
+                  <ProductImage p={p} index={i} brand={false} />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Информация и покупка */}
@@ -294,7 +300,7 @@ export function ProductDetail({ p }: { p: Product }) {
                   {compare.map((c) => (
                     <th key={c.id} className="p-2 text-left align-top font-medium">
                       <Link href={`/${lang}/p/${c.slug}`} className="block">
-                        <span className="block aspect-square w-24 overflow-hidden rounded-xl bg-surface"><ProductVisual pack={c.pack} color={c.color} /></span>
+                        <span className="block aspect-square w-24 overflow-hidden rounded-xl bg-surface"><ProductImage p={c} brand={false} /></span>
                         <span className="mt-2 line-clamp-2 block">{c.brand} {c.name}</span>
                       </Link>
                     </th>

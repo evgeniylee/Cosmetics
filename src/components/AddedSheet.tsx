@@ -2,14 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { PRODUCTS, getById } from "@/data/catalog";
+import { useCatalog } from "./CatalogProvider";
 import { useCartTotals } from "@/lib/useCart";
 import { money } from "@/lib/shop";
 import { track } from "@/lib/analytics";
 import { useShop, useUi } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
-import { ProductVisual } from "./ProductVisual";
+import { ProductImage } from "./ProductVisual";
 import { FreeShippingBar } from "./FreeShippingBar";
 
 /** Шторка после добавления в корзину: прогресс до бесплатной доставки и недорогие допродажи. */
@@ -19,6 +19,7 @@ export function AddedSheet() {
   const close = useUi((s) => s.setAdded);
   const { cart } = useCartTotals();
   const add = useShop((s) => s.add);
+  const { products, byId } = useCatalog();
   const pathname = usePathname();
 
   // Закрываем шторку при переходе на другую страницу.
@@ -32,9 +33,9 @@ export function AddedSheet() {
   }, [id, close]);
 
   if (!id) return null;
-  const p = getById(id);
+  const p = byId(id);
   if (!p) return null;
-  const upsell = PRODUCTS.filter((x) => x.id !== id && !cart[x.id]).sort((a, b) => a.price - b.price).slice(0, 3);
+  const upsell = products.filter((x) => x.id !== id && !cart[x.id]).sort((a, b) => a.price - b.price).slice(0, 3);
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label={t.added}>
@@ -46,7 +47,7 @@ export function AddedSheet() {
           <button type="button" onClick={() => close(null)} aria-label="✕" className="grid size-9 place-items-center rounded-full bg-surface"><Icon name="close" size={18} /></button>
         </div>
         <div className="mt-4 flex items-center gap-3">
-          <span className="size-16 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductVisual pack={p.pack} color={p.color} /></span>
+          <span className="size-16 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductImage p={p} brand={false} /></span>
           <span className="min-w-0 flex-1 text-[14px] leading-snug">{p.brand} {p.name}</span>
           <span className="font-bold tabular">{money(p.price, lang)}</span>
         </div>
@@ -56,7 +57,7 @@ export function AddedSheet() {
           {upsell.map((u) => (
             <div key={u.id} className="min-w-0">
               <Link href={`/${lang}/p/${u.slug}`} onClick={() => close(null)} className="block aspect-square overflow-hidden rounded-xl bg-surface">
-                <ProductVisual pack={u.pack} color={u.color} />
+                <ProductImage p={u} brand={false} />
               </Link>
               <p className="mt-1 line-clamp-2 text-[12px] leading-tight">{u.brand} {u.name}</p>
               <button

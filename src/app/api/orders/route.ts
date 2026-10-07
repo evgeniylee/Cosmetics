@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { SAMPLES, getById } from "@/data/catalog";
+import { SAMPLES } from "@/data/catalog";
+import { productsForOrder, promoByCode } from "@/server/catalog";
 import { CITIES, SAMPLES_FROM, bestDiscount, deliveryCost } from "@/lib/shop";
 import { many, one } from "@/server/db";
 import { currentCustomer, normalizePhone } from "@/server/auth";
@@ -43,11 +44,14 @@ export async function POST(req: Request) {
   if (b.payment === "cash" && city.id !== "tashkent") return NextResponse.json({ error: "cash_only_tashkent" }, { status: 400 });
 
   // Цены и скидки считаются только на сервере, данные из браузера не используются.
-  const lines = b.items.map((i) => ({ p: getById(i.id), qty: i.qty }));
+  const catalog = await productsForOrder(b.items.map((i) => i.id));
+  const lines = b.items.map((i) => ({ p: catalog.get(i.id), qty: i.qty }));
   if (lines.some((l) => !l.p)) return NextResponse.json({ error: "unknown_product" }, { status: 400 });
-  const items = lines.map((l) => ({ id: l.p!.id, name: `${l.p!.brand} ${l.p!.name}`, price: l.p!.price, qty: l.qty }));
+  if (lines.some((l) => l.p!.stock === "out")) return NextResponse.json({ error: "out_of_stock" }, { status: 409 });
+  const items = lines.map((l) => ({ id: l.p!.id, name: `${l.p!.brand} ${l.p!.name}`, price: l.p!.price, cost: l.p!.cost, qty: l.qty }));
   const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0);
-  const disc = bestDiscount(subtotal, b.promo ?? null);
+  const promo = await promoByCode(b.promo);
+  const disc = bestDiscount(subtotal, promo);
   const discount = disc?.amount ?? 0;
   const delivery = deliveryCost(city.id, subtotal - discount);
   const total = subtotal - discount + delivery;
@@ -59,10 +63,10 @@ export async function POST(req: Request) {
      VALUES ('N-' || nextval('order_number_seq'), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      RETURNING id, number`,
     [me?.id ?? null, status, phone, firstName, lastName, city.id, b.address, b.comment || null, b.payment,
-      subtotal, discount, disc?.source ?? null, delivery, total, disc ? b.promo : null, JSON.stringify(samples), b.utm ? JSON.stringify(b.utm) : null, b.lang ?? "ru"]
+      subtotal, discount, disc?.source ?? null, delivery, total, disc ? promo!.code : null, JSON.stringify(samples), b.utm ? JSON.stringify(b.utm) : null, b.lang ?? "ru"]
   );
   for (const i of items) {
-    await one(`INSERT INTO order_items (order_id, product_id, name, price, qty) VALUES ($1, $2, $3, $4, $5)`, [order!.id, i.id, i.name, i.price, i.qty]);
+    await one(`INSERT INTO order_items (order_id, product_id, name, price, cost, qty) VALUES ($1, $2, $3, $4, $5, $6)`, [order!.id, i.id, i.name, i.price, i.cost, i.qty]);
   }
 
   let isNewCustomer = false;
@@ -82,6 +86,7 @@ export async function POST(req: Request) {
 
   await notifyAdmin(
     orderMessage({
+      id: order!.id,
       number: order!.number,
       status,
       name: [firstName, lastName].filter(Boolean).join(" "),
@@ -101,7 +106,7 @@ export async function POST(req: Request) {
     })
   );
 
-  return NextResponse.json({ number: order!.number, status, total, discount, delivery, creatorCode: disc ? b.promo : null });
+  return NextResponse.json({ number: order!.number, status, total, discount, delivery, creatorCode: disc ? promo!.code : null });
 }
 
 export async function GET() {

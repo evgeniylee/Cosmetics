@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { CATEGORIES, PRODUCTS, getById } from "@/data/catalog";
-import { CREATOR_CODES } from "@/lib/shop";
+import { CATEGORIES } from "@/data/catalog";
+import { useCatalog } from "./CatalogProvider";
 import { track } from "@/lib/analytics";
 import { useHydrated, useShop } from "@/store/shop";
 import { useI18n } from "./I18n";
@@ -34,8 +34,9 @@ export function ContinueShopping() {
   const hydrated = useHydrated();
   const recent = useShop((s) => s.recent);
   const cartCount = useShop((s) => Object.keys(s.cart).length);
+  const { byId } = useCatalog();
   if (!hydrated || (recent.length === 0 && cartCount === 0)) return null;
-  const items = recent.map((id) => getById(id)!).filter(Boolean).slice(0, 8);
+  const items = recent.map((id) => byId(id)!).filter(Boolean).slice(0, 8);
   return (
     <TrackSection id="continue" className="wrap mt-14 md:mt-24">
       {items.length > 0 ? (
@@ -71,7 +72,9 @@ export function QuizBanner() {
 
 export function Hits() {
   const { lang, t } = useI18n();
-  const items = [...PRODUCTS].sort((a, b) => b.reviews - a.reviews).slice(0, 8);
+  const { products } = useCatalog();
+  const items = [...products].sort((a, b) => b.reviews - a.reviews).slice(0, 8);
+  if (!items.length) return null;
   return (
     <TrackSection id="hits" className="wrap mt-14 scroll-mt-28 md:mt-24">
       <span id="hits" />
@@ -85,9 +88,11 @@ export function Hits() {
 export function CreatorsPick() {
   const { lang, t } = useI18n();
   const [copied, setCopied] = useState(false);
-  const code = "MADINA";
-  const c = CREATOR_CODES[code];
-  const picks = ["1", "2", "5", "13"].map((id) => getById(id)!);
+  const { creator, byId } = useCatalog();
+  if (!creator) return null;
+  const code = creator.code;
+  const c = creator;
+  const picks = creator.picks.map((id) => byId(id)!).filter(Boolean).slice(0, 4);
   const copy = async () => {
     try { await navigator.clipboard.writeText(code); } catch {}
     setCopied(true);
@@ -100,7 +105,7 @@ export function CreatorsPick() {
       <div className="grid overflow-hidden rounded-panel bg-surface md:grid-cols-[360px_1fr] md:rounded-block">
         <div className="flex flex-col gap-4 p-5 md:border-r md:border-white md:p-8">
           <div className="aspect-[4/5] w-full max-w-[280px] rounded-panel bg-[linear-gradient(160deg,#f5d0de,#d9b9e8)]" aria-hidden>
-            <div className="grid h-full place-items-center text-[64px] font-bold text-white/80">М</div>
+            <div className="grid h-full place-items-center text-[64px] font-bold text-white/80">{c.name.slice(0, 1)}</div>
           </div>
           <div>
             <p className="text-[20px] font-bold">{c.name}</p>
@@ -108,7 +113,7 @@ export function CreatorsPick() {
           </div>
           <div className="flex items-center justify-between gap-3 rounded-card border-2 border-dashed border-accent bg-white px-4 py-3">
             <div>
-              <p className="text-[12px] text-muted">{t.creatorsCode} −10%</p>
+              <p className="text-[12px] text-muted">{t.creatorsCode} −{c.percent}%</p>
               <p className="text-[20px] font-bold tracking-wider">{code}</p>
             </div>
             <button type="button" onClick={copy} className="h-10 rounded-full bg-accent px-4 text-[14px] font-semibold text-white">{copied ? t.copied : t.copy}</button>
@@ -185,7 +190,7 @@ export function Trust() {
 
 export function Brands() {
   const { lang, t } = useI18n();
-  const brands = Array.from(new Set(PRODUCTS.map((p) => p.brand)));
+  const { brands } = useCatalog();
   return (
     <TrackSection id="brands" className="wrap mt-14 md:mt-24">
       <h2 className="h-section mb-5 md:mb-8">{t.brandsTitle}</h2>

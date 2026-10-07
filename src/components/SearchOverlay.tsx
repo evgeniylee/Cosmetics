@@ -8,7 +8,8 @@ import { track } from "@/lib/analytics";
 import { useHydrated, useShop, useUi } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
-import { ProductVisual } from "./ProductVisual";
+import { ProductImage } from "./ProductVisual";
+import { useCatalog } from "./CatalogProvider";
 
 export function SearchOverlay() {
   const { lang, t } = useI18n();
@@ -20,7 +21,8 @@ export function SearchOverlay() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const input = useRef<HTMLInputElement>(null);
-  const res = useMemo(() => search(q), [q]);
+  const { products } = useCatalog();
+  const res = useMemo(() => search(q, products), [q, products]);
 
   useEffect(() => {
     if (!open) return;
@@ -117,7 +119,7 @@ export function SearchOverlay() {
                         onClick={() => { searched(q.trim()); track("select_item", { item_id: p.id, source: "search_suggest" }); close(); }}
                         className="flex items-center gap-3 py-2.5"
                       >
-                        <span className="size-14 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductVisual pack={p.pack} color={p.color} /></span>
+                        <span className="size-14 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductImage p={p} brand={false} /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[15px] font-medium">{p.brand} {p.name}</span>
                           <span className="text-[13px] text-muted">{p.type[lang]}</span>

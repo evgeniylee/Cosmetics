@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { BRANDS, CATEGORIES, CONCERNS, PRODUCTS, SKIN_TYPES, type Product } from "@/data/catalog";
+import { CATEGORIES, CONCERNS, SKIN_TYPES, type Product } from "@/data/catalog";
+import { useCatalog } from "./CatalogProvider";
 import { search } from "@/lib/search";
 import { track } from "@/lib/analytics";
 import { useHydrated, useShop } from "@/store/shop";
@@ -13,14 +14,16 @@ import { ProductCard } from "./ProductCard";
 type Params = { cat?: string; skin?: string; concern?: string; brand?: string; q?: string; sort?: string; fav?: string; creator?: string };
 const PAGE = 8;
 
-function apply(params: Params, favorites: string[]): Product[] {
-  let list = params.q ? search(params.q).products : [...PRODUCTS];
+type Ctx = { products: Product[]; creatorPicks: Record<string, string[]> };
+
+function apply(params: Params, favorites: string[], ctx: Ctx): Product[] {
+  let list = params.q ? search(params.q, ctx.products).products : [...ctx.products];
   if (params.cat) list = list.filter((p) => p.cat === params.cat);
   if (params.skin) list = list.filter((p) => p.skin.includes(params.skin as never));
   if (params.concern) list = list.filter((p) => p.concerns.includes(params.concern as never));
   if (params.brand) list = list.filter((p) => p.brand === params.brand);
   if (params.fav) list = list.filter((p) => favorites.includes(p.id));
-  if (params.creator) list = list.filter((p) => ["1", "2", "5", "13"].includes(p.id));
+  if (params.creator) list = list.filter((p) => (ctx.creatorPicks[params.creator!.toUpperCase()] ?? []).includes(p.id));
   const s = params.sort || (params.q ? "relevance" : "popular");
   if (s === "popular") list.sort((a, b) => b.reviews - a.reviews);
   if (s === "cheap") list.sort((a, b) => a.price - b.price);
@@ -36,12 +39,14 @@ export function Catalog({ params }: { params: Params }) {
   const pathname = usePathname();
   const hydrated = useHydrated();
   const favorites = useShop((s) => s.favorites);
+  const { products, brands, creator } = useCatalog();
+  const ctx: Ctx = useMemo(() => ({ products, creatorPicks: creator ? { [creator.code]: creator.picks } : {} }), [products, creator]);
   const [limit, setLimit] = useState(PAGE);
   const [sheet, setSheet] = useState(false);
   const [draft, setDraft] = useState<Params>(params);
 
-  const list = useMemo(() => apply(params, hydrated ? favorites : []), [params, favorites, hydrated]);
-  const draftCount = useMemo(() => apply(draft, hydrated ? favorites : []).length, [draft, favorites, hydrated]);
+  const list = useMemo(() => apply(params, hydrated ? favorites : [], ctx), [params, favorites, hydrated, ctx]);
+  const draftCount = useMemo(() => apply(draft, hydrated ? favorites : [], ctx).length, [draft, favorites, hydrated, ctx]);
 
   const set = (next: Params) => {
     const q = new URLSearchParams();
@@ -51,7 +56,7 @@ export function Catalog({ params }: { params: Params }) {
   };
   const toggle = (key: keyof Params, value: string) => {
     const next = { ...params, [key]: params[key] === value ? undefined : value };
-    track("filter_apply", { filter: key, value, results_count: apply(next, favorites).length });
+    track("filter_apply", { filter: key, value, results_count: apply(next, favorites, ctx).length });
     set(next);
   };
 
@@ -60,7 +65,7 @@ export function Catalog({ params }: { params: Params }) {
   const groups = [
     { key: "skin" as const, label: t.skinType, opts: SKIN_TYPES.map((s) => ({ v: s.id, l: s.name[lang] })) },
     { key: "concern" as const, label: t.concern, opts: CONCERNS.map((s) => ({ v: s.id, l: s.name[lang] })) },
-    { key: "brand" as const, label: t.brand, opts: BRANDS.map((b) => ({ v: b, l: b })) },
+    { key: "brand" as const, label: t.brand, opts: brands.map((b) => ({ v: b, l: b })) },
   ];
   const activeChips = (["cat", "skin", "concern", "brand", "q", "fav"] as const).filter((k) => params[k]);
   const sorts = [["popular", t.sortPopular], ["new", t.sortNew], ["cheap", t.sortCheap], ["expensive", t.sortExpensive], ["rating", t.sortRating]] as const;
@@ -142,7 +147,7 @@ export function Catalog({ params }: { params: Params }) {
             <p className="font-semibold">{params.q ? `${t.searchNone} «${params.q}»` : t.searchNone}</p>
             <p className="mt-1 text-[14px] text-ink/70">{t.searchNoneHint}</p>
             <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-[30px]">
-              {PRODUCTS.slice(0, 4).map((p) => <ProductCard key={p.id} p={p} source="no_results" />)}
+              {products.slice(0, 4).map((p) => <ProductCard key={p.id} p={p} source="no_results" />)}
             </div>
           </div>
         ) : (

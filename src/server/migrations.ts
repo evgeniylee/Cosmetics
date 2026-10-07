@@ -153,4 +153,68 @@ INSERT INTO profile_questions (key, label_ru, label_uz, type, options, placement
  'profile', 0, 60);
 `,
   },
+  {
+    id: "003_catalog_admin",
+    sql: `
+-- Товары. Тексты на двух языках лежат в content (jsonb), чтобы добавлять поля без миграций.
+CREATE TABLE products (
+  id text PRIMARY KEY,
+  slug text NOT NULL UNIQUE,
+  brand text NOT NULL,
+  name text NOT NULL,
+  category text NOT NULL,
+  skin text[] NOT NULL DEFAULT '{}',
+  concerns text[] NOT NULL DEFAULT '{}',
+  volume numeric NOT NULL DEFAULT 0,
+  unit text NOT NULL DEFAULT 'ml',
+  price bigint NOT NULL,
+  old_price bigint,
+  cost_price bigint,                -- закупочная цена: только для админки
+  stock text NOT NULL DEFAULT 'in_stock', -- in_stock | on_order | out
+  active boolean NOT NULL DEFAULT true,
+  badge text,                       -- hit | choice | new
+  rating numeric NOT NULL DEFAULT 0,
+  reviews integer NOT NULL DEFAULT 0,
+  days_supply integer NOT NULL DEFAULT 60,
+  color text NOT NULL DEFAULT '#E6DCCB',
+  pack text NOT NULL DEFAULT 'bottle',
+  images jsonb NOT NULL DEFAULT '[]',
+  fbt text[] NOT NULL DEFAULT '{}',
+  content jsonb NOT NULL DEFAULT '{}', -- {type, desc, why, howTo, ingredients[], reviewSummary, rank}
+  sort integer NOT NULL DEFAULT 100,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX products_category ON products(category);
+
+-- Промокоды креаторов.
+CREATE TABLE promo_codes (
+  code text PRIMARY KEY,
+  creator_name text NOT NULL,
+  creator_handle text,
+  percent integer NOT NULL CHECK (percent BETWEEN 1 AND 50),
+  commission integer NOT NULL DEFAULT 7, -- % креатору со своих продаж
+  active boolean NOT NULL DEFAULT true,
+  featured boolean NOT NULL DEFAULT false, -- показывать в блоке «Выбор креаторов»
+  picks text[] NOT NULL DEFAULT '{}',      -- товары подборки
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE order_items ADD COLUMN cost bigint;
+ALTER TABLE orders ADD COLUMN manager_note text;
+ALTER TABLE orders ADD COLUMN paid_at timestamptz;
+ALTER TABLE orders ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+
+CREATE TABLE order_status_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  from_status text,
+  to_status text NOT NULL,
+  by_phone text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX order_status_log_order ON order_status_log(order_id, created_at);
+CREATE INDEX orders_status ON orders(status, created_at);
+`,
+  },
 ];

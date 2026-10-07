@@ -2,14 +2,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { SAMPLES } from "@/data/catalog";
-import { CITIES, CREATOR_CODES, SAMPLES_FROM, money } from "@/lib/shop";
+import { CITIES, SAMPLES_FROM, money } from "@/lib/shop";
 import { useCartTotals } from "@/lib/useCart";
 import { track } from "@/lib/analytics";
 import { useShop } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { FreeShippingBar } from "./FreeShippingBar";
-import { ProductVisual } from "./ProductVisual";
+import { ProductImage } from "./ProductVisual";
 
 export function Summary({ cta }: { cta?: React.ReactNode }) {
   const { lang, t } = useI18n();
@@ -32,26 +32,38 @@ export function PromoField() {
   const { hydrated } = useCartTotals();
   const [value, setValue] = useState("");
   const [err, setErr] = useState(false);
+  const [busy, setBusy] = useState(false);
   const active = hydrated ? promo : null;
-  const apply = () => {
+  const apply = async () => {
     const code = value.trim().toUpperCase();
-    if (!code) return;
-    const ok = !!CREATOR_CODES[code];
-    track("promo_apply", { code, success: ok, error_reason: ok ? null : "not_found" });
-    if (ok) { setPromo(code); setErr(false); setValue(""); } else setErr(true);
+    if (!code || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/promo?code=${encodeURIComponent(code)}`, { cache: "no-store" });
+      const ok = res.ok;
+      track("promo_apply", { code, success: ok, error_reason: ok ? null : "not_found" });
+      if (ok) {
+        const p = (await res.json()) as { code: string; percent: number };
+        setPromo(p); setErr(false); setValue("");
+      } else setErr(true);
+    } catch {
+      setErr(true);
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div>
       <label htmlFor="promo" className="text-[14px] font-semibold">{t.promo}</label>
       {active ? (
         <div className="mt-2 flex items-center justify-between rounded-xl bg-accent-soft px-3 py-2.5 text-[14px] text-accent">
-          <span>{t.promoOk(active)}</span>
+          <span>{t.promoOk(active.code, active.percent)}</span>
           <button type="button" onClick={() => setPromo(null)} aria-label={t.remove}><Icon name="close" size={16} /></button>
         </div>
       ) : (
         <div className="mt-2 flex gap-2">
           <input id="promo" value={value} onChange={(e) => { setValue(e.target.value); setErr(false); }} onKeyDown={(e) => e.key === "Enter" && apply()} placeholder="MADINA" className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-white px-3 font-semibold uppercase tracking-wider outline-none focus:border-accent" />
-          <button type="button" onClick={apply} className="h-11 rounded-xl bg-ink px-4 text-[14px] font-semibold text-white">{t.promoApply}</button>
+          <button type="button" onClick={apply} disabled={busy} className="h-11 rounded-xl bg-ink px-4 text-[14px] font-semibold text-white disabled:opacity-60">{t.promoApply}</button>
         </div>
       )}
       {err && <p className="mt-1.5 text-[13px] text-warn">{t.promoNotFound}</p>}
@@ -93,7 +105,7 @@ export function Cart() {
           <ul className="divide-y divide-line">
             {lines.map(({ p, qty }) => (
               <li key={p.id} className="flex gap-3 py-4 md:gap-5">
-                <Link href={`/${lang}/p/${p.slug}`} className="size-24 shrink-0 overflow-hidden rounded-card bg-surface md:size-28"><ProductVisual pack={p.pack} color={p.color} /></Link>
+                <Link href={`/${lang}/p/${p.slug}`} className="size-24 shrink-0 overflow-hidden rounded-card bg-surface md:size-28"><ProductImage p={p} brand={false} /></Link>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <Link href={`/${lang}/p/${p.slug}`} className="line-clamp-2 text-[15px] font-medium leading-snug">{p.brand} {p.name}</Link>
                   <span className="text-[13px] text-muted">{p.type[lang]}</span>

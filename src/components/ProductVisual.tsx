@@ -27,3 +27,12 @@ export function ProductVisual({ pack, color, brand }: { pack: Pack; color: strin
     </div>
   );
 }
+
+/** Фото товара, если оно загружено в админке, иначе нарисованная упаковка. */
+export function ProductImage({ p, index = 0, brand = true, className = "" }: { p: { images?: string[]; pack: Pack; color: string; brand: string; name?: string }; index?: number; brand?: boolean; className?: string }) {
+  const src = p.images?.[index];
+  if (src)
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={p.name ? `${p.brand} ${p.name}` : ""} loading="lazy" draggable={false} className={`h-full w-full object-contain ${className}`} />;
+  return <ProductVisual pack={p.pack} color={p.color} brand={brand ? p.brand : undefined} />;
+}

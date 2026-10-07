@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BRANDS } from "@/data/catalog";
+import { useCatalog } from "./CatalogProvider";
 import { MENU, type MenuSection } from "@/data/menu";
 import { track } from "@/lib/analytics";
 import { useUi } from "@/store/shop";
@@ -31,7 +31,8 @@ function BrandsPanel({ onPick }: { onPick: () => void }) {
   const { lang } = useI18n();
   const [q, setQ] = useState("");
   const [letter, setLetter] = useState<string | null>(null);
-  const letters = useMemo(() => Array.from(new Set(BRANDS.map((b) => (/[0-9]/.test(b[0]) ? "0–9" : b[0].toUpperCase())))).sort(), []);
+  const { brands: BRANDS } = useCatalog();
+  const letters = useMemo(() => Array.from(new Set(BRANDS.map((b) => (/[0-9]/.test(b[0]) ? "0–9" : b[0].toUpperCase())))).sort(), [BRANDS]);
   const list = BRANDS.filter((b) => (!q || b.toLowerCase().includes(q.toLowerCase())) && (!letter || b.toUpperCase().startsWith(letter) || (letter === "0–9" && /[0-9]/.test(b[0]))));
   return (
     <div>
