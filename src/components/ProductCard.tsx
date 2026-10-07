@@ -113,11 +113,11 @@ export function ProductCard({ p, source }: { p: Product; source: string }) {
         <FavButton id={p.id} className="absolute right-2 top-2" />
       </Link>
       <div className="mt-3 flex flex-1 flex-col gap-1">
-        <span className="text-[13px] text-ink/70 md:text-[14px]">{p.type[lang]}</span>
-        <Link href={`/${lang}/p/${p.slug}`} className="line-clamp-2 text-[15px] font-medium leading-snug md:text-[17px]">
+        <span className="truncate text-[13px] text-ink/70 md:text-[14px]">{p.type[lang]}</span>
+        <Link href={`/${lang}/p/${p.slug}`} className="line-clamp-2 min-h-[2.75em] text-[15px] font-medium leading-snug md:text-[17px]">
           {p.brand} {p.name}
         </Link>
-        <div className="flex flex-wrap items-center gap-x-2 text-[13px]">
+        <div className="flex min-h-5 flex-wrap items-center gap-x-2 text-[13px]">
           {p.reviews >= 3 && (
             <>
               <Stars value={p.rating} />
