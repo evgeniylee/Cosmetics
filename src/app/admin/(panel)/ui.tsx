@@ -9,7 +9,7 @@ const ITEMS = [
   { href: "/admin/orders", label: "Заказы", icon: "bag", badge: true },
   { href: "/admin/products", label: "Товары", icon: "jar" },
   { href: "/admin/customers", label: "Клиенты", icon: "user" },
-  { href: "/admin/promo", label: "Промокоды", icon: "gift" },
+  { href: "/admin/promo", label: "Креаторы", icon: "gift" },
 ];
 
 export function AdminNav({ mobile = false, fresh = 0 }: { mobile?: boolean; fresh?: number }) {

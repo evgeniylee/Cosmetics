@@ -217,4 +217,77 @@ CREATE INDEX order_status_log_order ON order_status_log(order_id, created_at);
 CREATE INDEX orders_status ON orders(status, created_at);
 `,
   },
+  {
+    id: "004_creators",
+    sql: `
+-- Креатор входит в кабинет по своему номеру.
+ALTER TABLE promo_codes ADD COLUMN creator_phone text;
+CREATE UNIQUE INDEX promo_codes_phone ON promo_codes(creator_phone) WHERE creator_phone IS NOT NULL;
+
+-- Ссылки креаторов: nabi.uz/c/<код>/<id>.
+CREATE TABLE creator_links (
+  id text PRIMARY KEY,
+  creator_code text NOT NULL REFERENCES promo_codes(code) ON UPDATE CASCADE,
+  label text NOT NULL,
+  target_type text NOT NULL,       -- home | picks | category | product
+  target text,                     -- slug товара или id категории
+  archived boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX creator_links_code ON creator_links(creator_code, created_at);
+
+-- Переходы без ботов-превью. visitor_id — случайный id из куки, для уникальных посетителей.
+CREATE TABLE link_clicks (
+  id bigserial PRIMARY KEY,
+  creator_code text NOT NULL,
+  link_id text,
+  visitor_id text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX link_clicks_code ON link_clicks(creator_code, created_at);
+CREATE INDEX link_clicks_link ON link_clicks(link_id, created_at);
+
+-- Последний переход клиента (для покупок с другого устройства) и окно 60 дней для новых клиентов.
+ALTER TABLE customers ADD COLUMN ref_code text, ADD COLUMN ref_link text, ADD COLUMN ref_at timestamptz,
+  ADD COLUMN referred_by text, ADD COLUMN referred_until timestamptz;
+
+-- Кому засчитан заказ и сколько комиссии.
+-- commission_status: pending (ждёт доставки и 7 дней) | paid | void (отмена, покупка самим креатором)
+--                    | clawback (отменён после выплаты — вычитается из следующей выплаты) | clawed
+ALTER TABLE orders ADD COLUMN creator_code text, ADD COLUMN attribution text, ADD COLUMN link_id text,
+  ADD COLUMN commission_rate integer, ADD COLUMN commission bigint NOT NULL DEFAULT 0, ADD COLUMN commission_status text,
+  ADD COLUMN commission_note text, ADD COLUMN delivered_at timestamptz, ADD COLUMN commission_available_at timestamptz,
+  ADD COLUMN payout_id uuid, ADD COLUMN new_customer boolean NOT NULL DEFAULT false;
+CREATE INDEX orders_creator ON orders(creator_code, created_at);
+
+CREATE TABLE creator_payouts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  creator_code text NOT NULL,
+  amount bigint NOT NULL,
+  orders_count integer NOT NULL,
+  note text,
+  paid_by text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX creator_payouts_code ON creator_payouts(creator_code, created_at);
+
+CREATE TABLE attribution_log (
+  id bigserial PRIMARY KEY,
+  order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  from_code text,
+  to_code text,
+  reason text NOT NULL,
+  by_phone text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Старые заказы с промокодом засчитываем креатору по коду.
+UPDATE orders o SET creator_code = o.promo_code, attribution = 'code', commission_rate = p.commission,
+  commission = round((o.subtotal - o.discount) * p.commission / 100.0),
+  commission_status = CASE WHEN o.status = 'cancelled' THEN 'void' ELSE 'pending' END,
+  delivered_at = CASE WHEN o.status = 'delivered' THEN coalesce(o.updated_at, o.created_at) END,
+  commission_available_at = CASE WHEN o.status = 'delivered' THEN coalesce(o.updated_at, o.created_at) + interval '7 days' END
+FROM promo_codes p WHERE p.code = o.promo_code;
+`,
+  },
 ];

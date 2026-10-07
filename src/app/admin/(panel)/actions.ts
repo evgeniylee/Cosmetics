@@ -7,6 +7,8 @@ import { assertAdmin } from "@/server/admin";
 import { invalidateCatalog } from "@/server/catalog";
 import { many, one } from "@/server/db";
 import { saveUpload } from "@/server/uploads";
+import { createPayout, onOrderStatus } from "@/server/creators";
+import { normalizePhone } from "@/server/auth";
 import { ProductInput } from "@/server/product-schema";
 import { newProductId, upsertProduct } from "@/server/products";
 
@@ -22,6 +24,7 @@ export async function setOrderStatus(orderId: string, status: string): Promise<A
   if (o.status === status) return { ok: true };
   await one(`UPDATE orders SET status = $2, updated_at = now() WHERE id = $1`, [orderId, status]);
   await one(`INSERT INTO order_status_log (order_id, from_status, to_status, by_phone) VALUES ($1, $2, $3, $4)`, [orderId, o.status, status, me.phone]);
+  await onOrderStatus(orderId, o.status, status);
   // Статистика клиента не учитывает отменённые заказы.
   if (o.customer_id && (o.status === "cancelled") !== (status === "cancelled")) {
     const sign = status === "cancelled" ? -1 : 1;
@@ -119,6 +122,7 @@ const PromoInput = z.object({
   active: z.boolean(),
   featured: z.boolean(),
   picks: z.array(z.string()).max(8),
+  creatorPhone: z.string().trim().max(30).optional(),
   isNew: z.boolean(),
 });
 
@@ -129,17 +133,56 @@ export async function savePromo(input: unknown): Promise<ActionResult> {
   const p = parsed.data;
   if (p.isNew && (await one(`SELECT code FROM promo_codes WHERE code = $1`, [p.code]))) return { ok: false, error: "Такой код уже есть", fields: { code: "Уже существует" } };
   // В блоке «Выбор креаторов» на главной показываем одного креатора.
+  const phone = p.creatorPhone ? normalizePhone(p.creatorPhone) : null;
+  if (p.creatorPhone && !phone) return { ok: false, error: "Проверьте телефон", fields: { creatorPhone: "Формат +998 XX XXX XX XX" } };
+  if (phone && (await one(`SELECT code FROM promo_codes WHERE creator_phone = $1 AND code <> $2`, [phone, p.code])))
+    return { ok: false, error: "Этот номер уже привязан к другому креатору", fields: { creatorPhone: "Уже используется" } };
   if (p.featured) await one(`UPDATE promo_codes SET featured = false WHERE code <> $1`, [p.code]);
   await one(
-    `INSERT INTO promo_codes (code, creator_name, creator_handle, percent, commission, active, featured, picks)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-     ON CONFLICT (code) DO UPDATE SET creator_name=$2, creator_handle=$3, percent=$4, commission=$5, active=$6, featured=$7, picks=$8`,
-    [p.code, p.creatorName, p.creatorHandle || null, p.percent, p.commission, p.active, p.featured, p.picks]
+    `INSERT INTO promo_codes (code, creator_name, creator_handle, percent, commission, active, featured, picks, creator_phone)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (code) DO UPDATE SET creator_name=$2, creator_handle=$3, percent=$4, commission=$5, active=$6, featured=$7, picks=$8, creator_phone=$9`,
+    [p.code, p.creatorName, p.creatorHandle || null, p.percent, p.commission, p.active, p.featured, p.picks, phone]
   );
   invalidateCatalog();
-  revalidatePath("/admin/promo");
+  revalidatePath("/admin/promo", "layout");
   revalidatePath("/", "layout");
   return { ok: true, message: p.isNew ? "Промокод создан" : "Промокод сохранён" };
+}
+
+// ---------- Креаторы: выплаты и ручная привязка ----------
+
+export async function payCreator(code: string, note: string): Promise<ActionResult> {
+  const me = await assertAdmin();
+  const r = await createPayout(code, me.phone, note.trim().slice(0, 200) || null);
+  if (!r) return { ok: false, error: "Нечего выплачивать" };
+  revalidatePath("/admin/promo", "layout");
+  return { ok: true, message: `Выплата ${r.amount.toLocaleString("ru-RU")} сум записана` };
+}
+
+export async function reassignOrder(orderId: string, code: string | null, reason: string): Promise<ActionResult> {
+  const me = await assertAdmin();
+  if (reason.trim().length < 3) return { ok: false, error: "Укажите причину" };
+  const o = await one<{ creator_code: string | null; commission_status: string | null; status: string; subtotal: string; discount: string }>(
+    `SELECT creator_code, commission_status, status, subtotal, discount FROM orders WHERE id = $1`, [orderId]);
+  if (!o) return { ok: false, error: "Заказ не найден" };
+  if (o.commission_status === "paid" || o.commission_status === "clawed") return { ok: false, error: "Комиссия по заказу уже выплачена — привязку не меняем" };
+  if ((o.creator_code ?? null) === code) return { ok: true };
+  if (code) {
+    const p = await one<{ commission: number }>(`SELECT commission FROM promo_codes WHERE code = $1`, [code]);
+    if (!p) return { ok: false, error: "Креатор не найден" };
+    await one(
+      `UPDATE orders SET creator_code = $2, attribution = 'manual', link_id = NULL, new_customer = false, commission_rate = $3, commission = $4,
+         commission_status = $5, commission_note = $6 WHERE id = $1`,
+      [orderId, code, p.commission, Math.round(((Number(o.subtotal) - Number(o.discount)) * p.commission) / 100), o.status === "cancelled" ? "void" : "pending", o.status === "cancelled" ? "Заказ отменён" : null]
+    );
+  } else {
+    await one(`UPDATE orders SET creator_code = NULL, attribution = NULL, link_id = NULL, new_customer = false, commission_rate = NULL, commission = 0, commission_status = NULL, commission_note = NULL WHERE id = $1`, [orderId]);
+  }
+  await one(`INSERT INTO attribution_log (order_id, from_code, to_code, reason, by_phone) VALUES ($1, $2, $3, $4, $5)`, [orderId, o.creator_code, code, reason.trim().slice(0, 300), me.phone]);
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/admin/promo", "layout");
+  return { ok: true, message: code ? `Заказ засчитан ${code}` : "Заказ отвязан от креатора" };
 }
 
 export async function productOptions() {

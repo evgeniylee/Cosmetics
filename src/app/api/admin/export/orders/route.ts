@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 type R = {
   number: string; status: OrderStatus; created_at: string; first_name: string | null; last_name: string | null; phone: string; city: string; address: string;
   comment: string | null; payment: string; paid_at: string | null; subtotal: string; discount: string; discount_source: string | null; delivery: string; total: string;
-  promo_code: string | null; items: string | null; cost: string | null; uncosted: boolean; utm: Record<string, string> | null; manager_note: string | null;
+  promo_code: string | null; creator_code: string | null; attribution: string | null; commission: string; items: string | null; cost: string | null; uncosted: boolean; utm: Record<string, string> | null; manager_note: string | null;
 };
 
 export async function GET(req: Request) {
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const days = Math.min(3650, Math.max(1, Number(new URL(req.url).searchParams.get("days")) || 365));
     const rows = await many<R>(
       `SELECT o.number, o.status, o.created_at, o.first_name, o.last_name, o.phone, o.city, o.address, o.comment, o.payment, o.paid_at,
-         o.subtotal, o.discount, o.discount_source, o.delivery, o.total, o.promo_code, o.utm, o.manager_note,
+         o.subtotal, o.discount, o.discount_source, o.delivery, o.total, o.promo_code, o.creator_code, o.attribution, o.commission, o.utm, o.manager_note,
          (SELECT string_agg(name || ' × ' || qty, '; ') FROM order_items WHERE order_id = o.id) AS items,
          (SELECT sum(cost * qty) FROM order_items WHERE order_id = o.id) AS cost,
          (SELECT bool_or(cost IS NULL) FROM order_items WHERE order_id = o.id) AS uncosted
@@ -44,6 +44,9 @@ export async function GET(req: Request) {
       { header: "Оплата", key: "payment", width: 12, value: (r) => PAYMENT_LABEL[r.payment] ?? r.payment },
       { header: "Оплачено", key: "paid", width: 17, date: true, value: (r) => tz(r.paid_at) },
       { header: "Промокод", key: "promo", width: 12, value: (r) => r.promo_code },
+      { header: "Креатор", key: "creator", width: 12, value: (r) => r.creator_code },
+      { header: "Как засчитан", key: "attr", width: 12, value: (r) => (r.attribution ? { code: "код", link: "ссылка", repeat: "60 дней", manual: "вручную" }[r.attribution] ?? r.attribution : null) },
+      { header: "Комиссия", key: "comm", money: true, value: (r) => (r.creator_code ? Number(r.commission) : null) },
       { header: "utm_source", key: "src", value: (r) => r.utm?.utm_source },
       { header: "utm_campaign", key: "camp", value: (r) => r.utm?.utm_campaign },
       { header: "Заметка менеджера", key: "note", width: 30, value: (r) => r.manager_note },

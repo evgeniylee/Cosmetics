@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { one } from "@/server/db";
 import { createSession, customerById, publicCustomer } from "@/server/auth";
+import { rememberRef } from "@/server/creators";
 import { DEMO_CODE, checkCode } from "@/server/gateway";
 
 const Body = z.object({ requestId: z.string().uuid(), code: z.string().regex(/^\d{4,8}$/) });
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
     [otp.phone]
   );
   await createSession(row!.id);
+  await rememberRef(row!.id); // переход креатора теперь привязан к номеру, а не только к браузеру
   await one(`INSERT INTO customer_events (customer_id, type, data) VALUES ($1, 'login', $2)`, [row!.id, JSON.stringify({ channel: otp.channel })]);
   const c = await customerById(row!.id);
   return NextResponse.json({ customer: publicCustomer(c!), isNew: row!.is_new });

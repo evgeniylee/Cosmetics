@@ -56,10 +56,10 @@ export default async function Dashboard() {
      WHERE o.created_at >= $1 AND o.status <> 'cancelled' GROUP BY oi.name ORDER BY qty DESC LIMIT 5`,
     [tashkentDayStart(29)]
   );
-  const promos = await many<{ code: string; orders: number; rev: string; commission: number }>(
-    `SELECT o.promo_code AS code, count(*)::int AS orders, sum(o.subtotal - o.discount) AS rev, max(p.commission) AS commission
-     FROM orders o LEFT JOIN promo_codes p ON p.code = o.promo_code
-     WHERE o.promo_code IS NOT NULL AND o.created_at >= $1 AND o.status <> 'cancelled' GROUP BY o.promo_code ORDER BY rev DESC LIMIT 5`,
+  const promos = await many<{ code: string; orders: number; rev: string; commission: string; fresh: number }>(
+    `SELECT creator_code AS code, count(*)::int AS orders, sum(subtotal - discount) AS rev,
+       sum(commission) FILTER (WHERE commission_status <> 'void') AS commission, count(*) FILTER (WHERE new_customer)::int AS fresh
+     FROM orders WHERE creator_code IS NOT NULL AND created_at >= $1 AND status <> 'cancelled' GROUP BY creator_code ORDER BY rev DESC LIMIT 5`,
     [tashkentDayStart(29)]
   );
   const recent = await many<{ id: string; number: string; status: OrderStatus; first_name: string | null; total: string; created_at: string }>(
@@ -119,14 +119,14 @@ export default async function Dashboard() {
               </ul>
             </Card>
             <Card>
-              <div className="flex items-center justify-between"><h2 className="font-bold">Креаторы за 30 дней</h2><Link href="/admin/promo" className="text-[14px] text-accent">Промокоды →</Link></div>
+              <div className="flex items-center justify-between"><h2 className="font-bold">Креаторы за 30 дней</h2><Link href="/admin/promo" className="text-[14px] text-accent">Креаторы →</Link></div>
               <ul className="mt-2 space-y-1.5 text-[14px]">
                 {promos.map((p) => (
                   <li key={p.code} className="flex gap-3">
                     <span className="w-24 font-semibold">{p.code}</span>
-                    <span className="flex-1 tabular text-muted">{p.orders} зак.</span>
+                    <span className="flex-1 tabular text-muted">{p.orders} зак. · {p.fresh} новых</span>
                     <span className="tabular">{fmtSum(p.rev)}</span>
-                    <span className="w-32 text-right tabular text-muted">к выплате {fmtSum((Number(p.rev) * (p.commission ?? 0)) / 100)}</span>
+                    <span className="w-32 text-right tabular text-muted">комиссия {fmtSum(p.commission ?? 0)}</span>
                   </li>
                 ))}
                 {!promos.length && <li className="text-muted">Заказов по промокодам пока нет</li>}

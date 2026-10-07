@@ -33,14 +33,14 @@ function apply(params: Params, favorites: string[], ctx: Ctx): Product[] {
   return list;
 }
 
-export function Catalog({ params }: { params: Params }) {
+export function Catalog({ params, picks }: { params: Params; picks?: { code: string; name: string; ids: string[] } | null }) {
   const { lang, t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const hydrated = useHydrated();
   const favorites = useShop((s) => s.favorites);
   const { products, brands, creator } = useCatalog();
-  const ctx: Ctx = useMemo(() => ({ products, creatorPicks: creator ? { [creator.code]: creator.picks } : {} }), [products, creator]);
+  const ctx: Ctx = useMemo(() => ({ products, creatorPicks: { ...(creator ? { [creator.code]: creator.picks } : {}), ...(picks ? { [picks.code]: picks.ids } : {}) } }), [products, creator, picks]);
   const [limit, setLimit] = useState(PAGE);
   const [sheet, setSheet] = useState(false);
   const [draft, setDraft] = useState<Params>(params);
@@ -61,7 +61,7 @@ export function Catalog({ params }: { params: Params }) {
   };
 
   const category = CATEGORIES.find((c) => c.id === params.cat);
-  const title = params.q ? `«${params.q}»` : params.fav ? t.favorites : category ? category.name[lang] : t.catalog;
+  const title = params.q ? `«${params.q}»` : params.fav ? t.favorites : category ? category.name[lang] : params.creator && picks ? (lang === "uz" ? `${picks.name} tanlovi` : `Выбор: ${picks.name}`) : t.catalog;
   const groups = [
     { key: "skin" as const, label: t.skinType, opts: SKIN_TYPES.map((s) => ({ v: s.id, l: s.name[lang] })) },
     { key: "concern" as const, label: t.concern, opts: CONCERNS.map((s) => ({ v: s.id, l: s.name[lang] })) },

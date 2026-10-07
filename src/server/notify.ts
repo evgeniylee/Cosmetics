@@ -47,6 +47,7 @@ export function orderMessage(o: {
   total: number;
   samples: string[];
   isNewCustomer: boolean;
+  creator?: string | null;
 }) {
   const pay = { click: "Click", payme: "Payme", cash: "Наличными курьеру" }[o.payment] ?? o.payment;
   const lines = [
@@ -63,6 +64,7 @@ export function orderMessage(o: {
     o.discount ? `Скидка ${esc(o.discountSource || "")}: −${fmt(o.discount)}` : null,
     `Доставка: ${o.delivery ? fmt(o.delivery) : "бесплатно"}`,
     `<b>Итого: ${fmt(o.total)}</b> · ${pay}`,
+    o.creator ? `👩‍🎤 Креатор: ${esc(o.creator)}` : null,
     // Ссылка на заказ в админке, если задан адрес сайта.
     o.id && process.env.SITE_URL ? `\n<a href="${process.env.SITE_URL.replace(/\/$/, "")}/admin/orders/${o.id}">Открыть в админке →</a>` : null,
   ];

@@ -6,6 +6,7 @@ import { CITIES, SAMPLES_FROM, bestDiscount, deliveryCost } from "@/lib/shop";
 import { many, one } from "@/server/db";
 import { currentCustomer, normalizePhone } from "@/server/auth";
 import { notifyAdmin, orderMessage } from "@/server/notify";
+import { applyAttribution, attributeOrder } from "@/server/creators";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,10 @@ export async function POST(req: Request) {
     await one(`INSERT INTO order_items (order_id, product_id, name, price, cost, qty) VALUES ($1, $2, $3, $4, $5, $6)`, [order!.id, i.id, i.name, i.price, i.cost, i.qty]);
   }
 
+  // Креатор: промокод → ссылка → закреплённый переход → окно 60 дней.
+  const attr = await attributeOrder({ customerId: me?.id ?? null, ordersBefore: Number(me?.orders_count ?? 0), phone, promoCode: promo?.code ?? null });
+  if (attr) await applyAttribution(order!.id, me?.id ?? null, subtotal - discount, attr);
+
   let isNewCustomer = false;
   if (me) {
     isNewCustomer = Number(me.orders_count) === 0;
@@ -103,10 +108,11 @@ export async function POST(req: Request) {
       total,
       samples: samples.map((s) => SAMPLES.find((x) => x.id === s)!.name.ru),
       isNewCustomer,
+      creator: attr ? `${attr.code} (${{ code: "промокод", link: "ссылка", repeat: "клиент креатора" }[attr.type]})${attr.selfPurchase ? " ⚠️ номер креатора" : ""}` : null,
     })
   );
 
-  return NextResponse.json({ number: order!.number, status, total, discount, delivery, creatorCode: disc ? promo!.code : null });
+  return NextResponse.json({ number: order!.number, status, total, discount, delivery, creatorCode: attr?.code ?? null });
 }
 
 export async function GET() {

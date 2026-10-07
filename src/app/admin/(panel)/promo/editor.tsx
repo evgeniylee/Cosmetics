@@ -6,16 +6,16 @@ import { savePromo } from "../actions";
 import { Card, Toast } from "../ui";
 
 export type PromoRow = {
-  code: string; creatorName: string; creatorHandle: string; percent: number; commission: number; active: boolean; featured: boolean; picks: string[];
-  orders: number; rev: number; orders30: number; rev30: number; customers: number;
+  code: string; creatorName: string; creatorHandle: string; creatorPhone: string; percent: number; commission: number; active: boolean; featured: boolean; picks: string[];
+  stats: { visitors: number; orders: number; revenue: number; newCustomers: number; toPay: number; pending: number };
 };
-type Form = Omit<PromoRow, "orders" | "rev" | "orders30" | "rev30" | "customers"> & { isNew: boolean };
+export type Form = Omit<PromoRow, "stats"> & { isNew: boolean };
 
 const input = "h-11 w-full rounded-xl border border-line bg-white px-3 text-[15px] outline-none focus:border-accent";
 
 export function PromoList({ rows, products }: { rows: PromoRow[]; products: { id: string; label: string }[] }) {
   const [edit, setEdit] = useState<Form | null>(null);
-  const blank: Form = { code: "", creatorName: "", creatorHandle: "", percent: 10, commission: 7, active: true, featured: false, picks: [], isNew: true };
+  const blank: Form = { code: "", creatorName: "", creatorHandle: "", creatorPhone: "", percent: 10, commission: 7, active: true, featured: false, picks: [], isNew: true };
   return (
     <div className="space-y-3 px-4 md:px-8">
       <button type="button" onClick={() => setEdit(blank)} className="h-11 rounded-full bg-accent px-5 font-semibold text-white">+ Новый промокод</button>
@@ -34,15 +34,17 @@ export function PromoList({ rows, products }: { rows: PromoRow[]; products: { id
               {r.featured && <span className="rounded-full bg-ink px-2 py-0.5 text-white">на главной</span>}
               <span className="rounded-full bg-surface px-2 py-0.5">комиссия {r.commission}%</span>
             </div>
-            <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-[13px]">
-              <div><dt className="text-muted">30 дней</dt><dd className="font-semibold tabular">{r.orders30} зак. · {fmtSum(r.rev30)}</dd></div>
-              <div><dt className="text-muted">К выплате за 30 дн</dt><dd className="font-semibold tabular">{fmtSum((r.rev30 * r.commission) / 100)}</dd></div>
-              <div><dt className="text-muted">Всего</dt><dd className="tabular">{r.orders} зак. · {fmtSum(r.rev)}</dd></div>
-              <div><dt className="text-muted">Покупателей</dt><dd className="tabular">{r.customers}</dd></div>
+            <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-[13px]">
+              <div><dt className="text-muted">Переходы</dt><dd className="font-semibold tabular">{r.stats.visitors}</dd></div>
+              <div><dt className="text-muted">Заказы</dt><dd className="font-semibold tabular">{r.stats.orders}</dd></div>
+              <div><dt className="text-muted">Новые клиенты</dt><dd className={`font-semibold tabular ${r.stats.orders >= 5 && r.stats.newCustomers / r.stats.orders < 0.3 ? "text-warn" : ""}`}>{r.stats.newCustomers}</dd></div>
+              <div className="col-span-2"><dt className="text-muted">Выручка</dt><dd className="font-semibold tabular">{fmtSum(r.stats.revenue)}</dd></div>
+              <div><dt className="text-muted">К выплате</dt><dd className="font-semibold tabular">{fmtSum(r.stats.toPay)}</dd></div>
             </dl>
+            {!r.creatorPhone && <p className="mt-2 text-[12px] text-[#9a5b00]">Нет телефона — креатор не сможет войти в кабинет</p>}
             <div className="mt-3 flex gap-2">
-              <button type="button" onClick={() => setEdit({ ...r, isNew: false })} className="h-9 rounded-full bg-surface px-4 text-[14px]">Изменить</button>
-              <CopyLink code={r.code} />
+              <a href={`/admin/promo/${r.code}`} className="h-9 rounded-full bg-ink px-4 text-[14px] leading-9 text-white">Открыть</a>
+              <button type="button" onClick={() => setEdit({ ...strip(r), isNew: false })} className="h-9 rounded-full bg-surface px-4 text-[14px]">Изменить</button>
             </div>
           </Card>
         ))}
@@ -53,19 +55,13 @@ export function PromoList({ rows, products }: { rows: PromoRow[]; products: { id
   );
 }
 
-function CopyLink({ code }: { code: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <button type="button" onClick={async () => {
-      const url = `${location.origin}/ru?promo=${code}&utm_source=creator&utm_campaign=${code.toLowerCase()}`;
-      try { await navigator.clipboard.writeText(url); setDone(true); setTimeout(() => setDone(false), 1800); } catch { /* буфер недоступен */ }
-    }} className="h-9 rounded-full px-3 text-[14px] text-accent">
-      {done ? "Скопировано ✓" : "Ссылка для креатора"}
-    </button>
-  );
-}
+const strip = (r: PromoRow): Omit<PromoRow, "stats"> => {
+  const { stats, ...rest } = r;
+  void stats;
+  return rest;
+};
 
-function Editor({ initial, products, onClose }: { initial: Form; products: { id: string; label: string }[]; onClose: () => void }) {
+export function Editor({ initial, products, onClose }: { initial: Form; products: { id: string; label: string }[]; onClose: () => void }) {
   const [f, setF] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
@@ -94,6 +90,7 @@ function Editor({ initial, products, onClose }: { initial: Form; products: { id:
         )}
         <div className="grid grid-cols-2 gap-2">
           <label className="block"><span className="text-[13px] text-muted">Имя креатора</span><input className={`${input} mt-1`} value={f.creatorName} onChange={(e) => set("creatorName", e.target.value)} />{errors.creatorName && <span className="text-[12px] text-warn">{errors.creatorName}</span>}</label>
+          <label className="col-span-2 block"><span className="text-[13px] text-muted">Телефон креатора — для входа в кабинет</span><input className={`${input} mt-1`} inputMode="tel" value={f.creatorPhone} onChange={(e) => set("creatorPhone", e.target.value)} placeholder="+998 90 123 45 67" />{errors.creatorPhone && <span className="text-[12px] text-warn">{errors.creatorPhone}</span>}</label>
           <label className="block"><span className="text-[13px] text-muted">Instagram / Telegram</span><input className={`${input} mt-1`} value={f.creatorHandle} onChange={(e) => set("creatorHandle", e.target.value)} placeholder="@nick" /></label>
           <label className="block"><span className="text-[13px] text-muted">Скидка покупателю, %</span><input className={`${input} mt-1`} inputMode="numeric" value={f.percent} onChange={(e) => set("percent", Number(e.target.value) || 0)} />{errors.percent && <span className="text-[12px] text-warn">{errors.percent}</span>}</label>
           <label className="block"><span className="text-[13px] text-muted">Комиссия креатору, %</span><input className={`${input} mt-1`} inputMode="numeric" value={f.commission} onChange={(e) => set("commission", Number(e.target.value) || 0)} /></label>

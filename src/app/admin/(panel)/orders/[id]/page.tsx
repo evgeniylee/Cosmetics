@@ -6,18 +6,22 @@ import { CITIES } from "@/lib/shop";
 import { SAMPLES } from "@/data/catalog";
 import { Card, PageHead } from "../../ui";
 import { OrderControls } from "./controls";
+import { AttributionControl } from "./attribution";
+import { COMMISSION_STATE, STATE_LABEL } from "@/server/creators";
 
 type Order = {
   id: string; number: string; status: OrderStatus; customer_id: string | null; phone: string; first_name: string | null; last_name: string | null;
   city: string; address: string; comment: string | null; payment: string; subtotal: string; discount: string; discount_source: string | null;
   delivery: string; total: string; promo_code: string | null; samples: string[] | null; utm: Record<string, string> | null; lang: string;
   manager_note: string | null; paid_at: string | null; created_at: string;
+  creator_code: string | null; attribution: string | null; link_id: string | null; commission: string; commission_rate: number | null; commission_note: string | null;
+  new_customer: boolean; state: string | null; commission_available_at: string | null;
 };
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const o = await one<Order>(`SELECT * FROM orders WHERE id = $1`, [id]);
+  const o = await one<Order>(`SELECT o.*, ${COMMISSION_STATE} AS state FROM orders o WHERE o.id = $1`, [id]);
   if (!o) notFound();
   const items = await many<{ product_id: string; name: string; price: string; cost: string | null; qty: number; slug: string | null }>(
     `SELECT oi.product_id, oi.name, oi.price, oi.cost, oi.qty, p.slug FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
@@ -27,6 +31,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     `SELECT from_status, to_status, by_phone, created_at FROM order_status_log WHERE order_id = $1 ORDER BY created_at DESC`,
     [id]
   );
+  const creators = await many<{ code: string; name: string }>(`SELECT code, creator_name AS name FROM promo_codes ORDER BY creator_name`);
+  const linkLabel = o.link_id ? (await one<{ label: string }>(`SELECT label FROM creator_links WHERE id = $1`, [o.link_id]))?.label ?? null : null;
+  const attrLog = await many<{ from_code: string | null; to_code: string | null; reason: string; by_phone: string | null; created_at: string }>(
+    `SELECT from_code, to_code, reason, by_phone, created_at FROM attribution_log WHERE order_id = $1 ORDER BY created_at DESC`, [id]);
   const customer = o.customer_id ? await one<{ orders_count: number; total_spent: string }>(`SELECT orders_count, total_spent FROM customers WHERE id = $1`, [o.customer_id]) : null;
 
   const costed = items.every((i) => i.cost != null);
@@ -96,6 +104,22 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
         <div className="space-y-4">
           <OrderControls id={o.id} status={o.status} paid={!!o.paid_at} note={o.manager_note ?? ""} />
+          <Card>
+            <h2 className="font-bold">Креатор</h2>
+            {o.creator_code ? (
+              <div className="mt-2 space-y-1 text-[14px]">
+                <p><Link href={`/admin/promo/${o.creator_code}`} className="font-semibold text-accent">{o.creator_code}</Link> · {{ code: "ввёл код", link: "по ссылке", repeat: "клиент креатора (60 дней)", manual: "назначен вручную" }[o.attribution ?? ""] ?? o.attribution}{linkLabel ? ` «${linkLabel}»` : ""}{o.new_customer ? " · новый клиент" : ""}</p>
+                <p className="tabular">Комиссия {o.commission_rate ?? 0}%: <b>{fmtSum(o.commission)}</b> · {o.state ? (o.state === "hold" && o.commission_available_at ? `подтвердится ${fmtDate(o.commission_available_at, false)}` : STATE_LABEL[o.state] ?? o.state) : "—"}</p>
+                {o.commission_note && <p className="text-[13px] text-warn">{o.commission_note}</p>}
+              </div>
+            ) : <p className="mt-2 text-[14px] text-muted">Заказ не связан с креатором</p>}
+            <AttributionControl id={o.id} current={o.creator_code} creators={creators} locked={o.state === "paid" || o.state === "clawed"} />
+            {attrLog.length > 0 && (
+              <ul className="mt-3 space-y-1 border-t border-line pt-3 text-[12px] text-muted">
+                {attrLog.map((l, i) => <li key={i}>{fmtDate(l.created_at)}: {l.from_code ?? "—"} → {l.to_code ?? "—"} · {l.reason}{l.by_phone ? ` · ${fmtPhone(l.by_phone)}` : ""}</li>)}
+              </ul>
+            )}
+          </Card>
           <Card>
             <h2 className="font-bold">История</h2>
             <ol className="mt-2 space-y-2 text-[13px]">
