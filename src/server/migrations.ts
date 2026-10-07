@@ -290,4 +290,27 @@ UPDATE orders o SET creator_code = o.promo_code, attribution = 'code', commissio
 FROM promo_codes p WHERE p.code = o.promo_code;
 `,
   },
+  {
+    id: "005_customer_account",
+    sql: `
+-- Корзина и избранное вошедшего клиента: одни и те же на всех устройствах.
+CREATE TABLE customer_cart (
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  product_id text NOT NULL,
+  qty integer NOT NULL CHECK (qty > 0 AND qty <= 50),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (customer_id, product_id)
+);
+CREATE TABLE customer_favorites (
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  product_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (customer_id, product_id)
+);
+-- Адреса с названиями («Дом», «Работа»).
+ALTER TABLE customer_addresses ADD COLUMN label text;
+-- Удалённый аккаунт: данные стёрты, заказы остаются для учёта.
+ALTER TABLE customers ADD COLUMN deleted_at timestamptz;
+`,
+  },
 ];

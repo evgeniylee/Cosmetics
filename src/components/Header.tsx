@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/data/menu";
 import { CITIES } from "@/lib/shop";
-import { useHydrated, useShop, useUi } from "@/store/shop";
+import { useHydrated, useSession, useShop, useUi } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 
@@ -48,6 +48,7 @@ function Burger({ open }: { open: boolean }) {
 
 export function Header() {
   const { lang, t } = useI18n();
+  const me = useSession((s) => s.customer);
   const pathname = usePathname();
   const city = useShop((s) => s.city);
   const setSearch = useUi((s) => s.setSearch);
@@ -126,7 +127,7 @@ export function Header() {
               {count > 0 && <span className={`absolute right-0.5 top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white tabular ${bump ? "anim-bump" : ""}`}>{count}</span>}
             </Link>
             <Link href={`/${lang}/account`} aria-label={t.profile} className={iconBtn}>
-              <Icon name="user" />
+              {me?.firstName ? <span className="grid size-8 place-items-center rounded-full bg-accent text-[14px] font-bold text-white">{me.firstName.slice(0, 1).toUpperCase()}</span> : <Icon name="user" />}
             </Link>
             <Link href={switchHref} className={`ml-1 grid h-9 place-items-center rounded-full border px-3 text-[13px] font-semibold uppercase transition-colors ${onDark ? "border-white/50 text-white" : "border-line text-ink hover:border-accent"}`}>
               {other}

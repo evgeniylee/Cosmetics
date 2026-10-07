@@ -9,6 +9,7 @@ import { Footer } from "@/components/Footer";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { AddedSheet } from "@/components/AddedSheet";
 import { Attribution } from "@/components/Attribution";
+import { AccountSync, LoginSheet } from "@/components/Auth";
 import { CatalogProvider } from "@/components/CatalogProvider";
 import { getPublicCatalog } from "@/server/catalog";
 
@@ -43,6 +44,8 @@ export default async function LangLayout({ children, params }: { children: React
           <BottomNav />
           <SearchOverlay />
           <AddedSheet />
+          <LoginSheet />
+          <AccountSync />
           </CatalogProvider>
         </I18nProvider>
       </body>

@@ -23,6 +23,8 @@ type ShopState = {
   toggleFav: (id: string) => void;
   viewed: (id: string) => void;
   searched: (q: string) => void;
+  replaceSynced: (cart: Record<string, number>, favorites: string[]) => void;
+  resetPersonal: () => void;
 };
 
 export const useShop = create<ShopState>()(
@@ -52,6 +54,9 @@ export const useShop = create<ShopState>()(
       toggleFav: (id) => set((s) => ({ favorites: s.favorites.includes(id) ? s.favorites.filter((x) => x !== id) : [...s.favorites, id] })),
       viewed: (id) => set((s) => ({ recent: [id, ...s.recent.filter((x) => x !== id)].slice(0, 12) })),
       searched: (q) => set((s) => ({ recentQueries: [q, ...s.recentQueries.filter((x) => x !== q)].slice(0, 5) })),
+      replaceSynced: (cart, favorites) => set({ cart, favorites }),
+      // Выход: чужому человеку на этом устройстве не нужны корзина, избранное и история.
+      resetPersonal: () => set({ cart: {}, favorites: [], promo: null, samples: [], recent: [], recentQueries: [] }),
     }),
     {
       name: "nabi-shop",
@@ -78,7 +83,12 @@ type UiState = {
   setMenu: (v: boolean) => void;
   heroTone: "light" | "dark";
   setHeroTone: (t: "light" | "dark") => void;
+  // Шторка входа: открывается из любого места, reason — зачем просим войти.
+  login: { open: boolean; reason: LoginReason };
+  openLogin: (reason?: LoginReason) => void;
+  closeLogin: () => void;
 };
+export type LoginReason = "default" | "favorites" | "orders";
 export const useUi = create<UiState>((set) => ({
   addedId: null,
   setAdded: (addedId) => set({ addedId }),
@@ -88,6 +98,9 @@ export const useUi = create<UiState>((set) => ({
   setMenu: (menuOpen) => set({ menuOpen }),
   heroTone: "light",
   setHeroTone: (heroTone) => set({ heroTone }),
+  login: { open: false, reason: "default" },
+  openLogin: (reason = "default") => set({ login: { open: true, reason }, menuOpen: false, searchOpen: false }),
+  closeLogin: () => set((s) => ({ login: { ...s.login, open: false } })),
 }));
 
 /** true после гидратации persist, чтобы не было расхождения SSR и клиента. */

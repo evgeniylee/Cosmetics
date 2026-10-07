@@ -41,19 +41,38 @@ export type Customer = {
   marketing_opt_in: boolean;
   city: string | null;
   orders_count: number;
+  lang: string;
 };
 
-const CUSTOMER_COLS = `c.id, c.phone, c.first_name, c.last_name, to_char(c.birth_date, 'YYYY-MM-DD') AS birth_date, c.marketing_opt_in, c.city, c.orders_count`;
+const CUSTOMER_COLS = `c.id, c.phone, c.first_name, c.last_name, to_char(c.birth_date, 'YYYY-MM-DD') AS birth_date, c.marketing_opt_in, c.city, c.orders_count, c.lang`;
 
 export async function currentCustomer(): Promise<Customer | null> {
   const c = await cookies();
   const token = c.get(COOKIE)?.value;
   if (!token) return null;
   const row = await one<Customer>(
-    `SELECT ${CUSTOMER_COLS} FROM sessions s JOIN customers c ON c.id = s.customer_id WHERE s.token_hash = $1 AND s.expires_at > now()`,
+    `SELECT ${CUSTOMER_COLS} FROM sessions s JOIN customers c ON c.id = s.customer_id WHERE s.token_hash = $1 AND s.expires_at > now() AND c.deleted_at IS NULL`,
     [sha256(token)]
   );
   return row ?? null;
+}
+
+/** Активный клиент не выходит из аккаунта: каждый визит продлевает сессию ещё на 90 дней (не чаще раза в сутки). */
+export async function refreshSession() {
+  const c = await cookies();
+  const token = c.get(COOKIE)?.value;
+  if (!token) return;
+  const r = await one<{ id: string }>(
+    `UPDATE sessions SET expires_at = now() + interval '${DAYS} days' WHERE token_hash = $1 AND expires_at > now() AND expires_at < now() + interval '${DAYS - 1} days' RETURNING id`,
+    [sha256(token)]
+  );
+  if (r) c.set(COOKIE, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: DAYS * 86400 });
+}
+
+/** Выход на всех устройствах. */
+export async function destroyAllSessions(customerId: string) {
+  await one(`DELETE FROM sessions WHERE customer_id = $1`, [customerId]);
+  (await cookies()).delete(COOKIE);
 }
 
 export async function destroySession() {
@@ -78,6 +97,7 @@ export function publicCustomer(c: Customer) {
     marketing: c.marketing_opt_in,
     city: c.city,
     ordersCount: Number(c.orders_count),
+    lang: c.lang,
     needsProfile: !c.first_name || !c.last_name,
   };
 }

@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { CITIES } from "@/lib/shop";
+import { CITIES, SUPPORT_URL } from "@/lib/shop";
 import { useCartTotals } from "@/lib/useCart";
 import { track } from "@/lib/analytics";
-import { ApiError, api, storedUtm } from "@/lib/api";
+import { ApiError, api, storedUtm, type ApiAddress } from "@/lib/api";
 import { useSession, useShop } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
@@ -78,6 +78,8 @@ export function Checkout() {
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
   const [pay, setPay] = useState<"click" | "payme" | "cash">("click");
+  const [saved, setSaved] = useState<ApiAddress[]>([]);
+  const [addrId, setAddrId] = useState<string | "new">("new");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ number: string; code: string | null; status: string } | null>(null);
@@ -93,10 +95,23 @@ export function Checkout() {
     if (customer.needsProfile) { setStep("profile"); return; }
     setReturning(true);
     setStep("delivery");
-    api.me().then((r) => {
-      if (r.address) { setAddress(r.address.address); setComment(r.address.comment ?? ""); setCity(r.address.city); }
-    }).catch(() => {});
+    loadSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLoaded, customer, verified, setCity]);
+
+  // Сохранённые адреса и способ оплаты из прошлого заказа: вошедшему клиенту остаётся нажать одну кнопку.
+  function loadSaved() {
+    api.addresses().then((r) => {
+      setSaved(r.addresses);
+      const def = r.addresses.find((a) => a.is_default) ?? r.addresses[0];
+      if (def) pickAddress(def);
+    }).catch(() => {});
+    api.me().then((r) => { if (r.lastPayment === "click" || r.lastPayment === "payme" || r.lastPayment === "cash") setPay(r.lastPayment); }).catch(() => {});
+  }
+  function pickAddress(a: ApiAddress | "new") {
+    if (a === "new") { setAddrId("new"); setAddress(""); setComment(""); return; }
+    setAddrId(a.id); setAddress(a.address); setComment(a.comment ?? ""); setCity(a.city);
+  }
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -120,7 +135,7 @@ export function Checkout() {
         {done.status === "needs_call" && <p className="mt-2 text-[14px]">{t.coNeedsCall}</p>}
         {done.code && <p className="mt-2 text-[14px] text-accent">{t.coDoneCreator(done.code)}</p>}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <a href="https://t.me/" target="_blank" rel="noreferrer" className="flex h-12 items-center gap-2 rounded-card bg-accent px-5 font-semibold text-white"><Icon name="telegram" size={18} /> {t.coTrack}</a>
+          <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="flex h-12 items-center gap-2 rounded-card bg-accent px-5 font-semibold text-white"><Icon name="telegram" size={18} /> {t.coTrack}</a>
           <Link href={`/${lang}/account`} className="grid h-12 place-items-center rounded-card bg-surface px-5 font-semibold">{t.profile}</Link>
         </div>
       </div>
@@ -184,7 +199,7 @@ export function Checkout() {
         setLast(r.customer.lastName ?? "");
         setReturning(true);
         setStep("delivery");
-        api.me().then((m) => { if (m.address) { setAddress(m.address.address); setCity(m.address.city); } }).catch(() => {});
+        loadSaved();
       }
     } catch (e) {
       const left = e instanceof ApiError ? (e.data.attemptsLeft as number | undefined) : undefined;
@@ -378,6 +393,27 @@ export function Checkout() {
           {/* 3. Доставка и оплата */}
           <StepCard n={returning ? 2 : 3} title={t.coDelivery} done={false} active={step === "delivery"}>
             <div className="space-y-3">
+              {saved.length > 0 && (
+                <div role="radiogroup" aria-label={t.coAddress} className="space-y-2">
+                  {saved.map((a) => (
+                    <button key={a.id} type="button" role="radio" aria-checked={addrId === a.id} onClick={() => pickAddress(a)}
+                      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors ${addrId === a.id ? "border-accent bg-accent-soft" : "border-line"}`}>
+                      <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 ${addrId === a.id ? "border-accent" : "border-line"}`}>{addrId === a.id && <span className="size-2.5 rounded-full bg-accent" />}</span>
+                      <span className="min-w-0 text-[15px]">
+                        <b>{a.label || CITIES.find((c) => c.id === a.city)?.[lang]}</b>
+                        <span className="block text-[14px] text-ink/75">{CITIES.find((c) => c.id === a.city)?.[lang]}, {a.address}</span>
+                        {a.comment && <span className="block text-[13px] text-muted">{a.comment}</span>}
+                      </span>
+                    </button>
+                  ))}
+                  <button type="button" role="radio" aria-checked={addrId === "new"} onClick={() => pickAddress("new")}
+                    className={`flex h-12 w-full items-center gap-3 rounded-xl border px-3 text-[15px] ${addrId === "new" ? "border-accent bg-accent-soft" : "border-line"}`}>
+                    <Icon name="plus" size={18} /> {lang === "ru" ? "Другой адрес" : "Boshqa manzil"}
+                  </button>
+                </div>
+              )}
+              {(addrId === "new" || saved.length === 0) && (
+                <>
               <Field label={t.coCity} id="co-city">
                 <select id="co-city" value={totals.city} onChange={(e) => setCity(e.target.value)} className={inputCls}>
                   {CITIES.map((c) => <option key={c.id} value={c.id}>{c[lang]}</option>)}
@@ -389,6 +425,10 @@ export function Checkout() {
               <Field label={t.coComment} id="comment">
                 <input id="comment" value={comment} onChange={(e) => setComment(e.target.value)} className={inputCls} />
               </Field>
+              {returning && <p className="text-[12px] text-muted">{lang === "ru" ? "Адрес сохранится в профиле — в следующий раз выберете его одним нажатием." : "Manzil profilda saqlanadi."}</p>}
+                </>
+              )}
+              {errors.address && addrId !== "new" && saved.length > 0 && <p role="alert" className="text-[12px] text-warn">{errors.address}</p>}
               <fieldset>
                 <legend className="text-[13px] font-medium text-ink/70">{t.coPayment}</legend>
                 <div className="mt-1 grid gap-2 sm:grid-cols-3">

@@ -70,3 +70,6 @@ export function bestDiscount(subtotal: number, promo: Promo | null) {
   if (promo) options.push({ source: promo.code, amount: Math.round((subtotal * promo.percent) / 100 / 1000) * 1000 });
   return options.sort((a, b) => b.amount - a.amount)[0] ?? null;
 }
+
+/** Ссылка на поддержку в Telegram (NEXT_PUBLIC_SUPPORT_TG, например https://t.me/nabi_support). */
+export const SUPPORT_URL = process.env.NEXT_PUBLIC_SUPPORT_TG || "https://t.me/";
