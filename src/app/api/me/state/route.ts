@@ -5,12 +5,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { many, one } from "@/server/db";
 import { currentCustomer } from "@/server/auth";
+import { parseKey } from "@/lib/variants";
 
 export const dynamic = "force-dynamic";
 
 const Body = z.object({
   mode: z.enum(["merge", "replace"]),
-  cart: z.record(z.string().max(40), z.number().int().min(1).max(50)).refine((c) => Object.keys(c).length <= 60),
+  cart: z.record(z.string().max(90), z.number().int().min(1).max(50)).refine((c) => Object.keys(c).length <= 60),
   favorites: z.array(z.string().max(40)).max(300),
 });
 
@@ -33,7 +34,8 @@ export async function PUT(req: Request) {
   if (!p.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const known = new Set((await many<{ id: string }>(`SELECT id FROM products`)).map((r) => r.id));
   let { cart, favorites } = p.data;
-  cart = Object.fromEntries(Object.entries(cart).filter(([id]) => known.has(id)));
+  // Ключ корзины может быть "товар~вариант": проверяем товар.
+  cart = Object.fromEntries(Object.entries(cart).filter(([k]) => known.has(parseKey(k).pid)));
   favorites = favorites.filter((id) => known.has(id));
 
   if (p.data.mode === "merge") {

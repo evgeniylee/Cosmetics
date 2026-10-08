@@ -23,8 +23,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const o = await one<Order>(`SELECT o.*, ${COMMISSION_STATE} AS state FROM orders o WHERE o.id = $1`, [id]);
   if (!o) notFound();
-  const items = await many<{ product_id: string; name: string; price: string; cost: string | null; qty: number; slug: string | null }>(
-    `SELECT oi.product_id, oi.name, oi.price, oi.cost, oi.qty, p.slug FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
+  const items = await many<{ product_id: string; variant_id: string | null; name: string; price: string; cost: string | null; qty: number; slug: string | null }>(
+    `SELECT oi.product_id, oi.variant_id, oi.name, oi.price, oi.cost, oi.qty, p.slug FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
     [id]
   );
   const log = await many<{ from_status: string | null; to_status: OrderStatus; by_phone: string | null; created_at: string }>(
@@ -82,7 +82,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <h2 className="font-bold">Состав заказа</h2>
             <ul className="mt-2 divide-y divide-line text-[14px]">
               {items.map((i) => (
-                <li key={i.product_id} className="flex gap-3 py-2.5">
+                <li key={`${i.product_id}~${i.variant_id ?? ""}`} className="flex gap-3 py-2.5">
                   <span className="min-w-0 flex-1">
                     {i.slug ? <Link href={`/admin/products/${i.product_id}`} className="hover:text-accent">{i.name}</Link> : i.name}
                     <span className="block text-[12px] text-muted tabular">{fmtSum(i.price)} × {i.qty}{i.cost != null && ` · себестоимость ${fmtSum(i.cost)}`}</span>

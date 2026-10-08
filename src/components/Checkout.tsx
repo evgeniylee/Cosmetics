@@ -252,7 +252,7 @@ export function Checkout() {
     setErrors({});
     try {
       const r = await api.createOrder({
-        items: totals.lines.map((l) => ({ id: l.p.id, qty: l.qty })),
+        items: totals.lines.map((l) => ({ id: l.key, qty: l.qty })),
         promo: promo?.code ?? null,
         city: totals.city,
         address: address.trim(),
@@ -448,10 +448,10 @@ export function Checkout() {
         <aside className="min-w-0 space-y-4 md:sticky md:top-28 md:self-start">
           <div className="space-y-5 rounded-panel p-5 shadow-float ring-1 ring-line md:p-6">
             <ul className="space-y-3">
-              {totals.lines.map(({ p, qty }) => (
-                <li key={p.id} className="flex items-center gap-3 text-[14px]">
+              {totals.lines.map(({ key, p, qty }) => (
+                <li key={key} className="flex items-center gap-3 text-[14px]">
                   <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductImage p={p} brand={false} /></span>
-                  <span className="min-w-0 flex-1 truncate">{p.brand} {p.name}</span>
+                  <span className="min-w-0 flex-1"><span className="block truncate">{p.brand} {p.name}</span>{p.variant && <span className="block truncate text-[12px] text-muted">{p.variant.name[lang] || p.variant.name.ru}</span>}</span>
                   <span className="text-muted tabular">×{qty}</span>
                 </li>
               ))}

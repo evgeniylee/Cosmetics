@@ -4,17 +4,17 @@ import { useCatalog } from "@/components/CatalogProvider";
 import { bestDiscount, deliveryCost } from "@/lib/shop";
 import { useHydrated, useShop } from "@/store/shop";
 
-export type CartLine = { p: Product; qty: number };
+export type CartLine = { key: string; p: Product; qty: number };
 
 export function useCartTotals() {
   const hydrated = useHydrated();
-  const { byId } = useCatalog();
+  const { byKey } = useCatalog();
   const rawCart = useShop((s) => s.cart);
   const promo = useShop((s) => s.promo);
   const city = useShop((s) => s.city);
   const cart = hydrated ? rawCart : {};
   const lines: CartLine[] = Object.entries(cart)
-    .map(([id, qty]) => ({ p: byId(id)!, qty }))
+    .map(([key, qty]) => ({ key, p: byKey(key)!, qty }))
     .filter((l) => l.p);
   const subtotal = lines.reduce((a, l) => a + l.p.price * l.qty, 0);
   const disc = bestDiscount(subtotal, hydrated ? promo : null);

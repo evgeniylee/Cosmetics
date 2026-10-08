@@ -10,6 +10,7 @@ import { useShop, useUi } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { ProductImage } from "./ProductVisual";
+import { cartKey, defaultVariant, parseKey, variantLabel } from "@/lib/variants";
 import { FreeShippingBar } from "./FreeShippingBar";
 
 /** Шторка после добавления в корзину: прогресс до бесплатной доставки и недорогие допродажи. */
@@ -19,7 +20,7 @@ export function AddedSheet() {
   const close = useUi((s) => s.setAdded);
   const { cart } = useCartTotals();
   const add = useShop((s) => s.add);
-  const { products, byId } = useCatalog();
+  const { products, byKey } = useCatalog();
   const pathname = usePathname();
 
   // Закрываем шторку при переходе на другую страницу.
@@ -33,9 +34,10 @@ export function AddedSheet() {
   }, [id, close]);
 
   if (!id) return null;
-  const p = byId(id);
+  const p = byKey(id);
   if (!p) return null;
-  const upsell = products.filter((x) => x.id !== id && !cart[x.id]).sort((a, b) => a.price - b.price).slice(0, 3);
+  const inCart = new Set(Object.keys(cart).map((k) => parseKey(k).pid));
+  const upsell = products.filter((x) => x.id !== p.id && !inCart.has(x.id) && x.stock !== "out").sort((a, b) => a.price - b.price).slice(0, 3);
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label={t.added}>
@@ -48,7 +50,7 @@ export function AddedSheet() {
         </div>
         <div className="mt-4 flex items-center gap-3">
           <span className="size-16 shrink-0 overflow-hidden rounded-xl bg-surface"><ProductImage p={p} brand={false} /></span>
-          <span className="min-w-0 flex-1 text-[14px] leading-snug">{p.brand} {p.name}</span>
+          <span className="min-w-0 flex-1 text-[14px] leading-snug">{p.brand} {p.name}{variantLabel(p, lang) && <span className="block text-[13px] text-muted">{variantLabel(p, lang)}</span>}</span>
           <span className="font-bold tabular">{money(p.price, lang)}</span>
         </div>
         <div className="mt-4"><FreeShippingBar /></div>
@@ -62,7 +64,7 @@ export function AddedSheet() {
               <p className="mt-1 line-clamp-2 text-[12px] leading-tight">{u.brand} {u.name}</p>
               <button
                 type="button"
-                onClick={() => { add(u.id); track("add_to_cart", { item_id: u.id, price: u.price, qty: 1, source: "added_sheet" }); }}
+                onClick={() => { add(cartKey(u.id, defaultVariant(u)?.id)); track("add_to_cart", { item_id: u.id, price: u.price, qty: 1, source: "added_sheet" }); }}
                 className="mt-1.5 flex h-8 w-full items-center justify-center gap-1 rounded-full bg-surface text-[12px] font-bold tabular"
               >
                 <Icon name="plus" size={14} /> {money(u.price, lang)}

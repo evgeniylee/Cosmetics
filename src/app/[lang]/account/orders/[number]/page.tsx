@@ -9,6 +9,7 @@ import { Icon } from "@/components/Icon";
 import { ProductImage } from "@/components/ProductVisual";
 import { AccountGate, ORDER_STATUS } from "@/components/AccountGate";
 import { useShop, useUi } from "@/store/shop";
+import { cartKey } from "@/lib/variants";
 
 const STEPS = ["new", "confirmed", "shipped", "delivered"] as const;
 const PAY: Record<string, { ru: string; uz: string }> = { click: { ru: "Click", uz: "Click" }, payme: { ru: "Payme", uz: "Payme" }, cash: { ru: "Наличными курьеру", uz: "Kuryerga naqd" } };
@@ -48,8 +49,8 @@ function Detail({ number }: { number: string }) {
   };
   const reorder = () => {
     const live = items.filter((i) => i.active);
-    live.forEach((i) => add(i.product_id, i.qty));
-    if (live[0]) setAdded(live[0].product_id);
+    live.forEach((i) => add(cartKey(i.product_id, i.variant_id), i.qty));
+    if (live[0]) setAdded(cartKey(live[0].product_id, live[0].variant_id));
   };
   const city = CITIES.find((c) => c.id === o.city)?.[lang] ?? o.city;
 
@@ -96,7 +97,7 @@ function Detail({ number }: { number: string }) {
             </>
           );
           return (
-            <li key={i.product_id}>
+            <li key={cartKey(i.product_id, i.variant_id)}>
               {i.slug && i.active ? <Link href={`/${lang}/p/${i.slug}`} className="flex items-center gap-3 p-3 hover:bg-surface/60">{inner}</Link> : <div className="flex items-center gap-3 p-3">{inner}</div>}
             </li>
           );

@@ -2,8 +2,8 @@
 // Строки сопоставляются по slug: есть в базе — обновляется, нет — создаётся.
 import "server-only";
 import ExcelJS from "exceljs";
-import { ProductInput, type ProductInputT } from "./product-schema";
-import type { ProductRow } from "./catalog";
+import { ProductInput, variantProblems, type ProductInputT } from "./product-schema";
+import type { ProductRow, VariantRow } from "./catalog";
 import { many } from "./db";
 
 type Def = { key: string; header: string; width?: number; hint?: string };
@@ -63,6 +63,22 @@ export function productToCells(r: ProductRow, slugById: Map<string, string>): Re
   };
 }
 
+const VARIANT_COLUMNS = [
+  { key: "product_slug", header: "product_slug", width: 30 },
+  { key: "kind", header: "kind", width: 8 },
+  { key: "variant_id", header: "variant_id", width: 14 },
+  { key: "name_ru", header: "name_ru", width: 18 },
+  { key: "name_uz", header: "name_uz", width: 18 },
+  { key: "hex", header: "hex", width: 9 },
+  { key: "volume", header: "volume", width: 8 },
+  { key: "price", header: "price", width: 11 },
+  { key: "old_price", header: "old_price", width: 11 },
+  { key: "cost_price", header: "cost_price", width: 11 },
+  { key: "stock", header: "stock", width: 10 },
+  { key: "sku", header: "sku", width: 14 },
+  { key: "images", header: "images", width: 40 },
+] as const;
+
 export async function productsWorkbook(rows: ProductRow[]) {
   const slugById = new Map(rows.map((r) => [r.id, r.slug]));
   const wb = new ExcelJS.Workbook();
@@ -72,6 +88,18 @@ export async function productsWorkbook(rows: ProductRow[]) {
   for (const r of rows) ws.addRow(productToCells(r, slugById));
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3EFEA" } };
+  // Варианты (оттенки и объёмы) — отдельным листом, строка на вариант.
+  const vrows = await many<VariantRow>(`SELECT * FROM product_variants WHERE product_id = ANY($1) ORDER BY product_id, sort`, [rows.map((r) => r.id)]);
+  const vs = wb.addWorksheet("Варианты", { views: [{ state: "frozen", ySplit: 1 }] });
+  vs.columns = VARIANT_COLUMNS.map((c) => ({ header: c.header, key: c.key, width: c.width }));
+  for (const v of vrows) {
+    const pr = rows.find((r) => r.id === v.product_id)!;
+    vs.addRow({ product_slug: pr.slug, kind: pr.variant_kind, variant_id: v.id, name_ru: v.name.ru, name_uz: v.name.uz, hex: v.hex ?? "", volume: v.volume != null ? Number(v.volume) : null,
+      price: v.price != null ? Number(v.price) : null, old_price: v.old_price != null ? Number(v.old_price) : null, cost_price: v.cost_price != null ? Number(v.cost_price) : null,
+      stock: v.stock, sku: v.sku ?? "", images: (v.images ?? []).join(", ") });
+  }
+  vs.getRow(1).font = { bold: true };
+  vs.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3EFEA" } };
   // Подсказки — на втором листе, не в примечаниях: примечания ломают чтение файлов, пересохранённых в других программах.
   const help = wb.addWorksheet("Как заполнять");
   help.columns = [{ header: "Колонка", key: "k", width: 16 }, { header: "Что писать", key: "h", width: 80 }];
@@ -79,6 +107,7 @@ export async function productsWorkbook(rows: ProductRow[]) {
   help.addRow({ k: "Общее", h: "Первая строка — названия колонок, не меняйте их. Товар ищется по slug: найден — обновится, нет — создастся. Удалить товар через файл нельзя: поставьте active = 0." });
   help.addRow({ k: "Цены", h: "В сумах целым числом, без пробелов и «сум». old_price — зачёркнутая цена, должна быть больше price." });
   for (const c of PRODUCT_COLUMNS) if (c.hint) help.addRow({ k: c.header, h: c.hint });
+  help.addRow({ k: "Варианты", h: "Лист «Варианты»: строка на оттенок или объём. kind = shade (оттенок: нужны hex и фото, цена общая из листа «Товары») или volume (объём: нужны volume и price). Если товар есть на листе «Варианты», его варианты заменяются строками из файла. Если товара там нет — варианты не меняются. variant_id не трогайте: пусто — новый вариант." });
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -118,6 +147,34 @@ export async function parseProductsFile(buf: ArrayBuffer): Promise<ImportResult>
   if (missing.length) return { rows: [], errors: [{ row: 1, message: `Нет обязательных колонок: ${missing.join(", ")}` }], total: 0 };
 
   const existing = await many<ProductRow>(`SELECT * FROM products`);
+  const existingVariants = await many<VariantRow>(`SELECT * FROM product_variants ORDER BY sort`);
+  const toVInput = (v: VariantRow) => ({ id: v.id, name: { ru: v.name.ru, uz: v.name.uz }, hex: v.hex, volume: v.volume != null ? Number(v.volume) : null,
+    price: v.price != null ? Number(v.price) : null, oldPrice: v.old_price != null ? Number(v.old_price) : null, costPrice: v.cost_price != null ? Number(v.cost_price) : null,
+    images: v.images ?? [], stock: v.stock, sku: v.sku });
+
+  // Лист «Варианты»: товары, которые там есть, получают варианты из файла.
+  const vsheet = wb.getWorksheet("Варианты");
+  const fileVariants = new Map<string, { kind: string; rows: { row: number; data: Record<string, unknown> }[] }>();
+  const verrors: { row: number; message: string }[] = [];
+  if (vsheet) {
+    const vidx = new Map<string, number>();
+    vsheet.getRow(1).eachCell((cell, col) => vidx.set(cellText(cell.value).toLowerCase(), col));
+    vsheet.eachRow((r, n) => {
+      if (n === 1) return;
+      const g = (k: string) => (vidx.has(k) ? cellText(r.getCell(vidx.get(k)!).value) : "");
+      const slug = g("product_slug").toLowerCase();
+      if (!slug && !g("name_ru")) return;
+      const kind = g("kind").toLowerCase();
+      if (!["shade", "volume"].includes(kind)) { verrors.push({ row: n, message: `Лист «Варианты», строка ${n}: kind должен быть shade или volume` }); return; }
+      const cur = fileVariants.get(slug) ?? { kind, rows: [] };
+      if (cur.kind !== kind) { verrors.push({ row: n, message: `Лист «Варианты», строка ${n}: у товара ${slug} смешаны shade и volume` }); return; }
+      const nums = { volume: num(g("volume")), price: num(g("price")), oldPrice: num(g("old_price")), costPrice: num(g("cost_price")) };
+      if (Object.values(nums).some((x) => Number.isNaN(x))) { verrors.push({ row: n, message: `Лист «Варианты», строка ${n}: цены и объём — числами` }); return; }
+      cur.rows.push({ row: n, data: { id: g("variant_id") || undefined, name: { ru: g("name_ru"), uz: g("name_uz") }, hex: g("hex") || null, ...nums,
+        images: g("images") ? split(g("images")) : [], stock: (g("stock") || "in_stock").toLowerCase(), sku: g("sku") || null } });
+      fileVariants.set(slug, cur);
+    });
+  }
   const bySlug = new Map(existing.map((p) => [p.slug, p]));
   const idBySlug = new Map(existing.map((p) => [p.slug, p.id]));
 
@@ -177,6 +234,15 @@ export async function parseProductsFile(buf: ArrayBuffer): Promise<ImportResult>
       sort: num(g("sort", String(prev?.sort ?? 1000))),
       images: r.get("images") ? split(r.get("images")) : prev?.images ?? [],
       fbt: fbtSlugs ? fbtSlugs.map((s) => idBySlug.get(s) ?? "") : prev?.fbt ?? [],
+      ...(() => {
+        const fv = fileVariants.get(slug);
+        if (fv) return { variantKind: fv.kind, variants: fv.rows.map((x) => {
+          const d = x.data as { id?: string };
+          // id варианта — только свой: чужой или выдуманный становится новым вариантом.
+          return d.id && existingVariants.some((v) => v.id === d.id && v.product_id === prev?.id) ? d : { ...d, id: undefined };
+        }) };
+        return { variantKind: prev?.variant_kind ?? "", variants: prev ? existingVariants.filter((v) => v.product_id === prev.id).map(toVInput) : [] };
+      })(),
       content: {
         type: L("type", pc.type), desc: L("desc", pc.desc), why: L("why", pc.why), howTo: L("howto", pc.howTo),
         ingredients: ingRu.map((ru, i) => pair(ru, ingUz[i] ?? "")),
@@ -195,9 +261,39 @@ export async function parseProductsFile(buf: ArrayBuffer): Promise<ImportResult>
     const parsed = ProductInput.safeParse(input);
     if (!parsed.success) {
       for (const i of parsed.error.issues) if (!/NaN/.test(i.message)) problems.push(`${i.path.join(".") || "строка"}: ${i.message}`);
-    } else if (parsed.data.oldPrice && parsed.data.oldPrice <= parsed.data.price) problems.push("old_price должна быть больше price");
+    } else {
+      if (parsed.data.oldPrice && parsed.data.oldPrice <= parsed.data.price && parsed.data.variantKind !== "volume") problems.push("old_price должна быть больше price");
+      for (const [k, m] of Object.entries(variantProblems(parsed.data))) problems.push(`варианты ${k.replace(/^variants\.(\d+)\./, (_, i) => `№${Number(i) + 1} `)}: ${m}`);
+    }
     if (problems.length) errors.push({ row: r.row, message: problems.slice(0, 4).join("; ") });
     else if (parsed.success) rows.push({ row: r.row, slug, action: prev ? "update" : "create", data: parsed.data });
   }
+  // Варианты для товаров, которых нет ни в файле, ни в базе.
+  for (const [slug, fv] of fileVariants) if (!seen.has(slug) && !bySlug.has(slug)) errors.push({ row: fv.rows[0].row, message: `Лист «Варианты», строка ${fv.rows[0].row}: товара ${slug} нет` });
+  // Товар есть только на листе «Варианты» (в «Товары» не попал) — обновляем его варианты.
+  for (const [slug, fv] of fileVariants) {
+    const prev = bySlug.get(slug);
+    if (seen.has(slug) || !prev) continue;
+    const vin = fv.rows.map((x) => { const d = x.data as { id?: string }; return d.id && existingVariants.some((v) => v.id === d.id && v.product_id === prev.id) ? d : { ...d, id: undefined }; });
+    const base = await productAsInput(prev, existingVariants);
+    const parsed = ProductInput.safeParse({ ...base, variantKind: fv.kind, variants: vin });
+    const vp = parsed.success ? variantProblems(parsed.data) : {};
+    if (!parsed.success || Object.keys(vp).length) errors.push({ row: fv.rows[0].row, message: `Лист «Варианты», товар ${slug}: ${parsed.success ? Object.values(vp)[0] : parsed.error.issues[0]?.message}` });
+    else rows.push({ row: fv.rows[0].row, slug, action: "update", data: parsed.data });
+  }
+  errors.push(...verrors);
   return { rows, errors, total: raw.length };
+}
+
+/** Товар из базы в виде данных формы — для обновления только вариантов. */
+async function productAsInput(r: ProductRow, variants: VariantRow[]) {
+  const c = r.content ?? {};
+  const E = { ru: "", uz: "" };
+  return {
+    id: r.id, slug: r.slug, brand: r.brand, name: r.name, category: r.category, skin: r.skin ?? [], concerns: r.concerns ?? [], volume: Number(r.volume), unit: r.unit,
+    price: Number(r.price), oldPrice: r.old_price != null ? Number(r.old_price) : null, costPrice: r.cost_price != null ? Number(r.cost_price) : null, stock: r.stock, active: r.active,
+    badge: r.badge ?? "", rating: Number(r.rating), reviews: r.reviews, daysSupply: r.days_supply, color: r.color, pack: r.pack, images: r.images ?? [], fbt: r.fbt ?? [], sort: r.sort,
+    variantKind: r.variant_kind ?? "", variants: variants.filter((v) => v.product_id === r.id),
+    content: { type: c.type ?? E, desc: c.desc ?? E, why: c.why ?? E, howTo: c.howTo ?? E, ingredients: c.ingredients ?? [], rank: c.rank ?? null, reviewSummary: c.reviewSummary ?? null },
+  };
 }

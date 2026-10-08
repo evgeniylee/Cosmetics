@@ -19,7 +19,7 @@ export type AddressInput = { label?: string | null; city: string; address: strin
 export type ApiOrderDetail = {
   order: { number: string; status: string; created_at: string; city: string; address: string; comment: string | null; payment: string; paid_at: string | null;
     subtotal: number; discount: number; discount_source: string | null; delivery: number; total: number; samples: string[] | null; delivered_at: string | null };
-  items: { product_id: string; name: string; price: number; qty: number; slug: string | null; images: string[] | null; pack: string | null; color: string | null; brand: string | null; active: boolean | null }[];
+  items: { product_id: string; variant_id: string | null; name: string; price: number; qty: number; slug: string | null; images: string[] | null; pack: string | null; color: string | null; brand: string | null; active: boolean | null }[];
   log: { to_status: string; created_at: string }[];
 };
 

@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useMemo } from "react";
 import type { Product } from "@/data/catalog";
+import { parseKey, withVariant } from "@/lib/variants";
 
 export type FeaturedCreator = { code: string; name: string; handle: string | null; percent: number; picks: string[] };
 type CatalogData = { products: Product[]; brands: string[]; creator: FeaturedCreator | null };
@@ -19,6 +20,12 @@ export function useCatalog() {
     return {
       ...c,
       byId: (id: string) => byIdMap.get(id),
+      /** Товар по ключу корзины ("товар" или "товар~вариант"), развёрнутый под вариант. */
+      byKey: (key: string) => {
+        const { pid, vid } = parseKey(key);
+        const p = byIdMap.get(pid);
+        return p ? withVariant(p, vid) : undefined;
+      },
       bySlug: (slug: string) => c.products.find((p) => p.slug === slug),
     };
   }, [c]);

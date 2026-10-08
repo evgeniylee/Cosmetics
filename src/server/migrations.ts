@@ -335,4 +335,28 @@ CREATE TABLE brands (
 );
 `,
   },
+  {
+    id: "007_variants",
+    sql: `
+-- Варианты товара: оттенки (цена общая) или объёмы (своя цена).
+ALTER TABLE products ADD COLUMN variant_kind text;
+CREATE TABLE product_variants (
+  id text PRIMARY KEY,
+  product_id text NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  name jsonb NOT NULL,
+  hex text,
+  volume numeric,
+  price bigint,
+  old_price bigint,
+  cost_price bigint,
+  images jsonb NOT NULL DEFAULT '[]',
+  stock text NOT NULL DEFAULT 'in_stock',
+  sku text,
+  sort integer NOT NULL DEFAULT 0
+);
+CREATE INDEX product_variants_product ON product_variants(product_id, sort);
+-- В заказе — какой именно вариант.
+ALTER TABLE order_items ADD COLUMN variant_id text, ADD COLUMN variant_name text;
+`,
+  },
 ];

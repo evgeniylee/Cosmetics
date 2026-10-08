@@ -11,7 +11,8 @@ import { applyAttribution, attributeOrder } from "@/server/creators";
 export const dynamic = "force-dynamic";
 
 const Body = z.object({
-  items: z.array(z.object({ id: z.string(), qty: z.number().int().min(1).max(20) })).min(1).max(50),
+  // id — ключ корзины: "товар" или "товар~вариант".
+  items: z.array(z.object({ id: z.string().max(90), qty: z.number().int().min(1).max(20) })).min(1).max(50),
   promo: z.string().trim().toUpperCase().max(32).nullable().optional(),
   city: z.string(),
   address: z.string().trim().min(3).max(300),
@@ -49,7 +50,11 @@ export async function POST(req: Request) {
   const lines = b.items.map((i) => ({ p: catalog.get(i.id), qty: i.qty }));
   if (lines.some((l) => !l.p)) return NextResponse.json({ error: "unknown_product" }, { status: 400 });
   if (lines.some((l) => l.p!.stock === "out")) return NextResponse.json({ error: "out_of_stock" }, { status: 409 });
-  const items = lines.map((l) => ({ id: l.p!.id, name: `${l.p!.brand} ${l.p!.name}`, price: l.p!.price, cost: l.p!.cost, qty: l.qty }));
+  const items = lines.map((l) => {
+    const v = l.p!.variant;
+    const vname = v ? v.name.ru || v.name.uz : null;
+    return { id: l.p!.id, variantId: v?.id ?? null, variantName: vname, name: `${l.p!.brand} ${l.p!.name}${vname ? `, ${vname}` : ""}`, price: l.p!.price, cost: l.p!.cost, qty: l.qty };
+  });
   const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0);
   const promo = await promoByCode(b.promo);
   const disc = bestDiscount(subtotal, promo);
@@ -67,7 +72,7 @@ export async function POST(req: Request) {
       subtotal, discount, disc?.source ?? null, delivery, total, disc ? promo!.code : null, JSON.stringify(samples), b.utm ? JSON.stringify(b.utm) : null, b.lang ?? "ru"]
   );
   for (const i of items) {
-    await one(`INSERT INTO order_items (order_id, product_id, name, price, cost, qty) VALUES ($1, $2, $3, $4, $5, $6)`, [order!.id, i.id, i.name, i.price, i.cost, i.qty]);
+    await one(`INSERT INTO order_items (order_id, product_id, name, price, cost, qty, variant_id, variant_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [order!.id, i.id, i.name, i.price, i.cost, i.qty, i.variantId, i.variantName]);
   }
 
   // Креатор: промокод → ссылка → закреплённый переход → окно 60 дней.
@@ -120,7 +125,7 @@ export async function GET() {
   if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const orders = await many<{ id: string; number: string; status: string; total: string; created_at: string; items: { id: string; name: string; qty: number }[] }>(
     `SELECT o.id, o.number, o.status, o.total, o.created_at,
-       COALESCE(json_agg(json_build_object('id', i.product_id, 'name', i.name, 'qty', i.qty)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+       COALESCE(json_agg(json_build_object('id', CASE WHEN i.variant_id IS NULL THEN i.product_id ELSE i.product_id || '~' || i.variant_id END, 'name', i.name, 'qty', i.qty)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
      FROM orders o LEFT JOIN order_items i ON i.order_id = o.id
      WHERE o.customer_id = $1 GROUP BY o.id ORDER BY o.created_at DESC LIMIT 50`,
     [me.id]

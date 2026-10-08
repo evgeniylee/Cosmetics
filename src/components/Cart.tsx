@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SAMPLES } from "@/data/catalog";
 import { CITIES, SAMPLES_FROM, money } from "@/lib/shop";
 import { useCartTotals } from "@/lib/useCart";
+import { variantLabel } from "@/lib/variants";
 import { track } from "@/lib/analytics";
 import { useShop } from "@/store/shop";
 import { useI18n } from "./I18n";
@@ -103,19 +104,24 @@ export function Cart() {
         <div className="min-w-0 space-y-6">
           <FreeShippingBar />
           <ul className="divide-y divide-line">
-            {lines.map(({ p, qty }) => (
-              <li key={p.id} className="flex gap-3 py-4 md:gap-5">
-                <Link href={`/${lang}/p/${p.slug}`} className="size-24 shrink-0 overflow-hidden rounded-card bg-surface md:size-28"><ProductImage p={p} brand={false} /></Link>
+            {lines.map(({ key, p, qty }) => (
+              <li key={key} className="flex gap-3 py-4 md:gap-5">
+                <Link href={`/${lang}/p/${p.slug}${p.variant ? `?v=${p.variant.id}` : ""}`} className="size-24 shrink-0 overflow-hidden rounded-card bg-surface md:size-28"><ProductImage p={p} brand={false} /></Link>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <Link href={`/${lang}/p/${p.slug}`} className="line-clamp-2 text-[15px] font-medium leading-snug">{p.brand} {p.name}</Link>
-                  <span className="text-[13px] text-muted">{p.type[lang]}</span>
+                  <Link href={`/${lang}/p/${p.slug}${p.variant ? `?v=${p.variant.id}` : ""}`} className="line-clamp-2 text-[15px] font-medium leading-snug">{p.brand} {p.name}</Link>
+                  {p.variant ? (
+                    <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink/80">
+                      {p.variant.hex && <span className="size-3.5 rounded-full ring-1 ring-ink/15" style={{ background: p.variant.hex }} />}
+                      {variantLabel(p, lang)}
+                    </span>
+                  ) : <span className="text-[13px] text-muted">{p.type[lang]}</span>}
                   <div className="mt-auto flex items-center gap-3 pt-2">
                     <div className="flex h-10 items-center rounded-full bg-surface">
-                      <button type="button" aria-label="−" onClick={() => setQty(p.id, qty - 1)} className="grid h-full w-10 place-items-center"><Icon name="minus" size={16} /></button>
+                      <button type="button" aria-label="−" onClick={() => setQty(key, qty - 1)} className="grid h-full w-10 place-items-center"><Icon name="minus" size={16} /></button>
                       <span className="min-w-5 text-center font-semibold tabular">{qty}</span>
-                      <button type="button" aria-label="+" onClick={() => setQty(p.id, qty + 1)} className="grid h-full w-10 place-items-center"><Icon name="plus" size={16} /></button>
+                      <button type="button" aria-label="+" onClick={() => setQty(key, qty + 1)} className="grid h-full w-10 place-items-center"><Icon name="plus" size={16} /></button>
                     </div>
-                    <button type="button" onClick={() => { setQty(p.id, 0); track("remove_from_cart", { item_id: p.id }); }} aria-label={t.remove} className="text-muted hover:text-ink"><Icon name="trash" size={20} /></button>
+                    <button type="button" onClick={() => { setQty(key, 0); track("remove_from_cart", { item_id: p.id }); }} aria-label={t.remove} className="text-muted hover:text-ink"><Icon name="trash" size={20} /></button>
                     <span className="ml-auto font-bold tabular">{money(p.price * qty, lang)}</span>
                   </div>
                 </div>

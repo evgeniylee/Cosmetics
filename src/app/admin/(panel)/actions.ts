@@ -9,7 +9,7 @@ import { many, one } from "@/server/db";
 import { saveUpload } from "@/server/uploads";
 import { createPayout, onOrderStatus } from "@/server/creators";
 import { normalizePhone } from "@/server/auth";
-import { ProductInput } from "@/server/product-schema";
+import { ProductInput, variantProblems } from "@/server/product-schema";
 import { newProductId, upsertProduct } from "@/server/products";
 
 export type ActionResult = { ok: true; message?: string; id?: string } | { ok: false; error: string; fields?: Record<string, string> };
@@ -62,7 +62,9 @@ export async function saveProduct(input: unknown): Promise<ActionResult> {
   const parsed = ProductInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Проверьте поля формы", fields: fieldErrors(parsed.error) };
   const p = parsed.data;
-  if (p.oldPrice && p.oldPrice <= p.price) return { ok: false, error: "Старая цена должна быть больше текущей", fields: { oldPrice: "Больше текущей цены" } };
+  if (p.oldPrice && p.oldPrice <= p.price && p.variantKind !== "volume") return { ok: false, error: "Старая цена должна быть больше текущей", fields: { oldPrice: "Больше текущей цены" } };
+  const vp = variantProblems(p);
+  if (Object.keys(vp).length) return { ok: false, error: "Проверьте варианты", fields: vp };
   const clash = await one<{ id: string }>(`SELECT id FROM products WHERE slug = $1 AND id <> $2`, [p.slug, p.id ?? ""]);
   if (clash) return { ok: false, error: "Такой адрес страницы уже занят", fields: { slug: "Уже используется" } };
   const id = p.id || newProductId();

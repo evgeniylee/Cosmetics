@@ -8,6 +8,7 @@ import { fmtSum } from "@/lib/admin-format";
 import { saveProduct, uploadProductImage } from "../../actions";
 import { compressImage } from "@/lib/compress-image";
 import { Card, Toast } from "../../ui";
+import { VariantsEditor } from "./variants";
 
 type L = { ru: string; uz: string };
 const TR: Record<string, string> = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ы: "y", э: "e", ю: "yu", я: "ya" };
@@ -104,7 +105,10 @@ export function ProductForm({ initial, options, brands }: { initial: ProductInpu
   });
 
   const submit = () => start(async () => {
-    const clean = { ...p, content: { ...p.content, ingredients: p.content.ingredients.filter((i) => i.ru.trim() || i.uz.trim()).map((i) => ({ ru: i.ru.trim(), uz: i.uz.trim() || i.ru.trim() })) } };
+    // У объёмов цена товара = минимальная цена объёма.
+    const vPrices = p.variantKind === "volume" ? p.variants.map((v) => v.price ?? 0).filter((x) => x > 0) : [];
+    const base = vPrices.length ? { ...p, price: Math.min(...vPrices) } : p;
+    const clean = { ...base, content: { ...p.content, ingredients: p.content.ingredients.filter((i) => i.ru.trim() || i.uz.trim()).map((i) => ({ ru: i.ru.trim(), uz: i.uz.trim() || i.ru.trim() })) } };
     const r = await saveProduct(clean);
     if (!r.ok) { setErrors(r.fields ?? {}); flash(r.error); return; }
     setErrors({});
@@ -150,6 +154,7 @@ export function ProductForm({ initial, options, brands }: { initial: ProductInpu
 
         <Card className="space-y-3">
           <h2 className="font-bold">Цена и себестоимость</h2>
+          {p.variantKind === "volume" && <p className="rounded-xl bg-accent-soft px-3 py-2 text-[13px]">У товара объёмы: цены и себестоимость задаются у каждого объёма в блоке «Варианты». Здесь — цена самого дешёвого объёма.</p>}
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Цена, сум" error={e("price")}><input className={input} inputMode="numeric" value={p.price || ""} onChange={(ev) => set("price", num(ev.target.value) ?? 0)} /></Field>
             <Field label="Старая цена" error={e("oldPrice")} hint="Зачёркнутая, если есть скидка"><input className={input} inputMode="numeric" value={p.oldPrice ?? ""} onChange={(ev) => set("oldPrice", num(ev.target.value))} /></Field>
@@ -190,6 +195,8 @@ export function ProductForm({ initial, options, brands }: { initial: ProductInpu
           <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(ev) => { if (ev.target.files?.length) upload(ev.target.files); ev.target.value = ""; }} />
           <p className="text-[12px] text-muted">Лучше всего — товар на белом или светлом фоне, квадрат. Фото сжимаются автоматически. Только реальные фото товара, без генерации.</p>
         </Card>
+
+        <VariantsEditor kind={p.variantKind} variants={p.variants} unit={p.unit} onKind={(k) => set("variantKind", k)} onChange={(v) => set("variants", v)} errors={errors} />
 
         <Card className="space-y-3">
           <h2 className="font-bold">Для кого</h2>

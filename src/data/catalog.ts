@@ -36,6 +36,23 @@ export type Product = {
   fbt: string[];
   images?: string[];
   stock?: "in_stock" | "on_order" | "out";
+  /** Варианты: оттенки (цена общая, свой цвет и фото) или объёмы (своя цена). */
+  variantKind?: VariantKind;
+  variants?: Variant[];
+  /** Заполнено, когда товар «развёрнут» под конкретный вариант (корзина, страница товара). */
+  variant?: Variant;
+};
+
+export type VariantKind = "shade" | "volume";
+export type Variant = {
+  id: string;
+  name: L10n;
+  hex?: string;
+  volume?: number;
+  price?: number;
+  oldPrice?: number;
+  images: string[];
+  stock: "in_stock" | "on_order" | "out";
 };
 
 export const CATEGORIES: { id: CategoryId; name: L10n; icon: string }[] = [

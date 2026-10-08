@@ -13,6 +13,7 @@ import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { Badge, FavButton, PriceButton, ProductCard, Stars } from "./ProductCard";
 import { ProductImage } from "./ProductVisual";
+import { cartKey, defaultVariant, withVariant } from "@/lib/variants";
 import { Rail } from "./Section";
 
 function DeliveryPromise() {
@@ -82,8 +83,8 @@ function FrequentlyBought({ p }: { p: Product }) {
           type="button"
           disabled={!sel.length}
           onClick={() => {
-            sel.forEach((id) => add(id));
-            setAdded(p.id);
+            sel.forEach((id) => { const it = items.find((x) => x.id === id); add(cartKey(id, it?.variant?.id ?? (it ? defaultVariant(it)?.id : undefined))); });
+            setAdded(cartKey(p.id, p.variant?.id ?? defaultVariant(p)?.id));
             track("fbt_add", { item_id: p.id, count: sel.length, value: total });
           }}
           className="ml-auto h-12 rounded-card bg-ink px-5 font-semibold text-white disabled:opacity-40"
@@ -101,9 +102,63 @@ const DEMO_REVIEWS = [
   { name: "Камила", skin: "oily", stars: 4, text: { ru: "Хорошо, но на моей жирной коже к вечеру немного блестит.", uz: "Yaxshi, lekin yog'li terimda kechga yaltiraydi." }, helpful: 3 },
 ];
 
-export function ProductDetail({ p }: { p: Product }) {
+/** Выбор варианта: кружки оттенков или плашки объёмов. */
+function VariantPicker({ base, sel, onPick }: { base: Product; sel: string; onPick: (id: string) => void }) {
+  const { lang } = useI18n();
+  const ru = lang === "ru";
+  const vs = base.variants ?? [];
+  const cur = vs.find((v) => v.id === sel);
+  if (base.variantKind === "shade")
+    return (
+      <div className="mt-5">
+        <p className="text-[15px]">
+          <span className="text-ink/60">{ru ? "Оттенок:" : "Rang:"}</span> <b>{cur ? cur.name[lang] || cur.name.ru : ""}</b>
+          {cur?.stock === "out" && <span className="ml-2 text-[13px] text-warn">{ru ? "нет в наличии" : "mavjud emas"}</span>}
+          {cur?.stock === "on_order" && <span className="ml-2 text-[13px] text-[#9a5b00]">{ru ? "под заказ" : "buyurtma asosida"}</span>}
+        </p>
+        <div className="mt-2.5 flex flex-wrap gap-2.5" role="radiogroup" aria-label={ru ? "Оттенок" : "Rang"}>
+          {vs.map((v) => (
+            <button key={v.id} type="button" role="radio" aria-checked={v.id === sel} aria-label={v.name[lang] || v.name.ru} title={v.name[lang] || v.name.ru} onClick={() => onPick(v.id)}
+              className={`relative size-10 rounded-full ring-1 ring-ink/15 transition md:size-11 ${v.id === sel ? "outline outline-2 outline-offset-[3px] outline-ink" : "hover:scale-105"}`}
+              style={{ background: v.hex ?? "#ddd" }}>
+              {v.stock === "out" && <span className="absolute left-1/2 top-1/2 h-px w-[120%] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-ink/60" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  return (
+    <div className="mt-5">
+      <p className="text-[15px] text-ink/60">{ru ? "Объём" : "Hajm"}</p>
+      <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={ru ? "Объём" : "Hajm"}>
+        {vs.map((v) => (
+          <button key={v.id} type="button" role="radio" aria-checked={v.id === sel} onClick={() => onPick(v.id)} disabled={v.stock === "out"}
+            className={`min-w-[96px] rounded-2xl border-2 px-4 py-2 text-left transition disabled:opacity-40 ${v.id === sel ? "border-ink" : "border-line hover:border-ink/40"}`}>
+            <span className="block text-[15px] font-semibold">{v.name[lang] || v.name.ru}</span>
+            {v.price != null && <span className="block text-[13px] text-ink/70 tabular">{money(v.price, lang)}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ProductDetail({ p: base, initialVariant }: { p: Product; initialVariant?: string }) {
   const { lang, t } = useI18n();
   const router = useRouter();
+  const hasVariants = (base.variants?.length ?? 0) > 0;
+  const [vid, setVid] = useState<string | undefined>(() =>
+    hasVariants ? (base.variants!.some((v) => v.id === initialVariant) ? initialVariant : defaultVariant(base)?.id) : undefined
+  );
+  const p = withVariant(base, vid);
+  const key = cartKey(p.id, p.variant?.id);
+  const pickVariant = (id: string) => {
+    setVid(id);
+    setShot(0);
+    track("variant_select", { item_id: p.id, variant: id });
+    // Ссылка помнит выбранный вариант: ею можно поделиться.
+    router.replace(`/${lang}/p/${p.slug}?v=${id}`, { scroll: false });
+  };
   const viewed = useShop((s) => s.viewed);
   const add = useShop((s) => s.add);
   const { products } = useCatalog();
@@ -129,7 +184,8 @@ export function ProductDetail({ p }: { p: Product }) {
   const dist = [5, 4, 3, 2, 1].map((s) => ({ s, pct: s === 5 ? 78 : s === 4 ? 15 : s === 3 ? 5 : 1 }));
 
   const buyNow = () => {
-    add(p.id);
+    if (p.stock === "out") return;
+    add(key);
     track("buy_now_click", { item_id: p.id });
     router.push(`/${lang}/checkout`);
   };
@@ -178,6 +234,7 @@ export function ProductDetail({ p }: { p: Product }) {
           <h1 className="mt-1 text-[22px] font-bold leading-tight md:text-[30px]">{p.brand} {p.name}</h1>
           <p className="mt-1 text-[15px] text-ink/70">{p.type[lang]} · {volumeLabel(p, lang)}</p>
           {p.rank && <span className="mt-3 inline-block rounded-full bg-surface px-3 py-1 text-[13px] font-medium">{p.rank[lang]}</span>}
+          {hasVariants && vid && <VariantPicker base={base} sel={vid} onPick={pickVariant} />}
 
           <div ref={buyRef} className="mt-5 rounded-panel bg-white p-5 shadow-float ring-1 ring-line md:p-7">
             <div className="flex flex-wrap items-baseline gap-x-3">
@@ -189,14 +246,15 @@ export function ProductDetail({ p }: { p: Product }) {
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => { add(p.id); useUi.getState().setAdded(p.id); track("add_to_cart", { item_id: p.id, price: p.price, qty: 1, source: "pdp" }); }}
-                className="h-14 flex-1 rounded-card bg-accent text-[16px] font-semibold text-white hover:bg-accent-dark md:h-[64px] md:text-[17px]"
+                disabled={p.stock === "out"}
+                onClick={() => { add(key); useUi.getState().setAdded(key); track("add_to_cart", { item_id: p.id, variant: p.variant?.id, price: p.price, qty: 1, source: "pdp" }); }}
+                className="h-14 flex-1 rounded-card bg-accent text-[16px] font-semibold text-white hover:bg-accent-dark disabled:bg-line disabled:text-muted md:h-[64px] md:text-[17px]"
               >
-                {t.addToCart}
+                {p.stock === "out" ? (lang === "ru" ? "Нет в наличии" : "Mavjud emas") : t.addToCart}
               </button>
               <FavButton id={p.id} className="!size-14 shrink-0 !rounded-card bg-surface md:!size-[64px]" />
             </div>
-            <button type="button" onClick={buyNow} className="mt-2 h-12 w-full rounded-card border border-ink/15 font-semibold hover:border-ink">
+            <button type="button" onClick={buyNow} disabled={p.stock === "out"} className="mt-2 h-12 w-full disabled:opacity-40 rounded-card border border-ink/15 font-semibold hover:border-ink">
               {t.buyNow}
             </button>
             <p className="mt-4 flex items-start gap-2 rounded-xl bg-accent-soft p-3 text-[13px] text-ink/80">
