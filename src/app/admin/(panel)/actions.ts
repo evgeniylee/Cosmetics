@@ -189,3 +189,37 @@ export async function productOptions() {
   await assertAdmin();
   return many<{ id: string; label: string }>(`SELECT id, brand || ' ' || name AS label FROM products ORDER BY brand, name`);
 }
+
+// ---------- Бренды ----------
+
+const L10nIn = z.object({ ru: z.string().trim().max(6000), uz: z.string().trim().max(6000) });
+const BrandInput = z.object({
+  slug: z.string(),
+  country: L10nIn,
+  tagline: L10nIn,
+  story: L10nIn,
+  faq: z.array(z.object({ q: L10nIn, a: L10nIn })).max(20),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  heroImage: z.string().startsWith("/").nullable(),
+  heroImageMobile: z.string().startsWith("/").nullable(),
+  logo: z.string().startsWith("/").nullable(),
+  active: z.boolean(),
+  sort: z.coerce.number().int().min(0).max(100000),
+});
+
+export async function saveBrand(input: unknown): Promise<ActionResult> {
+  await assertAdmin();
+  const p = BrandInput.safeParse(input);
+  if (!p.success) return { ok: false, error: "Проверьте поля", fields: fieldErrors(p.error) };
+  const b = p.data;
+  const l = (x: { ru: string; uz: string }) => (x.ru || x.uz ? JSON.stringify(x) : null);
+  const r = await one<{ name: string }>(
+    `UPDATE brands SET country = $2, tagline = $3, story = $4, faq = $5, color = $6, hero_image = $7, hero_image_mobile = $8, logo = $9, active = $10, sort = $11, updated_at = now()
+     WHERE slug = $1 RETURNING name`,
+    [b.slug, l(b.country), l(b.tagline), l(b.story), JSON.stringify(b.faq.filter((f) => f.q.ru || f.q.uz)), b.color, b.heroImage, b.heroImageMobile, b.logo, b.active, b.sort]
+  );
+  if (!r) return { ok: false, error: "Бренд не найден" };
+  revalidatePath("/admin/brands", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Бренд сохранён" };
+}

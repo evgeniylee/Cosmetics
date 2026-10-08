@@ -313,4 +313,26 @@ ALTER TABLE customer_addresses ADD COLUMN label text;
 ALTER TABLE customers ADD COLUMN deleted_at timestamptz;
 `,
   },
+  {
+    id: "006_brands",
+    sql: `
+-- Страницы брендов. name совпадает с products.brand; тексты на двух языках.
+CREATE TABLE brands (
+  slug text PRIMARY KEY,
+  name text NOT NULL UNIQUE,
+  country jsonb,
+  tagline jsonb,
+  story jsonb,
+  faq jsonb NOT NULL DEFAULT '[]',
+  color text NOT NULL DEFAULT '#EFE7E2',
+  hero_image text,
+  hero_image_mobile text,
+  logo text,
+  active boolean NOT NULL DEFAULT true,
+  sort integer NOT NULL DEFAULT 1000,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+`,
+  },
 ];

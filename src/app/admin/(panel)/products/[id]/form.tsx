@@ -6,6 +6,7 @@ import type { ProductInputT } from "@/server/product-schema";
 import { ProductVisual } from "@/components/ProductVisual";
 import { fmtSum } from "@/lib/admin-format";
 import { saveProduct, uploadProductImage } from "../../actions";
+import { compressImage } from "@/lib/compress-image";
 import { Card, Toast } from "../../ui";
 
 type L = { ru: string; uz: string };
@@ -40,21 +41,6 @@ function Chips<T extends string>({ all, value, onChange }: { all: { id: T; name:
       })}
     </div>
   );
-}
-
-/** Сжимаем фото в браузере: длинная сторона до 1400px, WebP (или JPEG, если браузер не умеет WebP). */
-async function compress(file: File): Promise<File> {
-  const bmp = await createImageBitmap(file);
-  const k = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bmp.width * k);
-  canvas.height = Math.round(bmp.height * k);
-  canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-  const blob = (b: string) => new Promise<Blob | null>((res) => canvas.toBlob(res, b, 0.86));
-  let out = await blob("image/webp");
-  if (!out || out.type !== "image/webp") out = await blob("image/jpeg");
-  if (!out) throw new Error("Не удалось обработать фото");
-  return new File([out], out.type === "image/webp" ? "photo.webp" : "photo.jpg", { type: out.type });
 }
 
 export function ProductForm({ initial, options, brands }: { initial: ProductInputT; options: { id: string; label: string }[]; brands: string[] }) {
@@ -99,7 +85,7 @@ export function ProductForm({ initial, options, brands }: { initial: ProductInpu
     for (const f of list) {
       try {
         const fd = new FormData();
-        fd.set("file", await compress(f));
+        fd.set("file", await compressImage(f));
         const r = await uploadProductImage(fd);
         if (r.ok && r.url) setP((s) => ({ ...s, images: [...s.images, r.url!] }));
         else flash(r.ok ? "Не удалось загрузить" : r.error);

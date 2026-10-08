@@ -1,4 +1,5 @@
 "use client";
+import { brandSlug } from "@/lib/slug";
 import Link from "next/link";
 import { useState } from "react";
 import { CATEGORIES } from "@/data/catalog";
@@ -196,7 +197,7 @@ export function Brands() {
       <h2 className="h-section mb-5 md:mb-8">{t.brandsTitle}</h2>
       <div className="no-scrollbar flex gap-3 overflow-x-auto md:grid md:grid-cols-6 md:gap-5">
         {brands.map((b, i) => (
-          <Link key={b} data-stagger style={{ "--i": Math.min(i, 8) } as React.CSSProperties} href={`/${lang}/catalog?brand=${encodeURIComponent(b)}`} className="grid h-20 w-40 shrink-0 place-items-center rounded-card bg-surface px-3 text-center text-[16px] font-bold uppercase tracking-[0.12em] hover:bg-accent-soft md:h-[106px] md:w-auto md:text-[18px]">
+          <Link key={b} data-stagger style={{ "--i": Math.min(i, 8) } as React.CSSProperties} href={`/${lang}/brands/${brandSlug(b)}`} className="grid h-20 w-40 shrink-0 place-items-center rounded-card bg-surface px-3 text-center text-[16px] font-bold uppercase tracking-[0.12em] hover:bg-accent-soft md:h-[106px] md:w-auto md:text-[18px]">
             {b}
           </Link>
         ))}

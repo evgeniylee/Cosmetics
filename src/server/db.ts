@@ -2,6 +2,8 @@
 // Локально без DATABASE_URL — встроенный PGlite (Postgres в WASM), файлы в ./.data/pglite.
 import { MIGRATIONS } from "./migrations";
 import { SEED_PRODUCTS } from "@/data/catalog";
+import { BRAND_COUNTRY_DEFAULT, BRAND_SEEDS } from "@/data/brands";
+import { brandSlug } from "@/lib/slug";
 
 export type Row = Record<string, unknown>;
 export interface Db {
@@ -46,6 +48,18 @@ async function migrate(db: Db) {
   }
 }
 
+async function seedBrands(db: Db) {
+  // Каждому бренду из товаров — своя страница; описания для демо-брендов.
+  const { rows } = await db.query<{ brand: string }>(`SELECT DISTINCT brand FROM products`);
+  for (const { brand } of rows) {
+    const s = BRAND_SEEDS.find((b) => b.name === brand);
+    await db.query(
+      `INSERT INTO brands (slug, name, country, tagline, story, faq, color) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+      [brandSlug(brand), brand, JSON.stringify(BRAND_COUNTRY_DEFAULT), s ? JSON.stringify(s.tagline) : null, s ? JSON.stringify(s.story) : null, JSON.stringify(s?.faq ?? []), s?.color ?? "#EFE7E2"]
+    );
+  }
+}
+
 /** Первое заполнение: демо-товары и промокоды, если таблицы пустые. */
 async function seed(db: Db) {
   const { rows } = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM products`);
@@ -79,6 +93,7 @@ export function db(): Promise<Db> {
       const d = await connect();
       await migrate(d);
       await seed(d);
+      await seedBrands(d);
       return d;
     })().catch((e) => {
       globalThis.__nabiDb = undefined;

@@ -1,4 +1,5 @@
 "use client";
+import { brandSlug } from "@/lib/slug";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -173,7 +174,8 @@ export function ProductDetail({ p }: { p: Product }) {
               {t.share} <Icon name="share" size={16} />
             </button>
           </div>
-          <h1 className="mt-2 text-[22px] font-bold leading-tight md:text-[30px]">{p.brand} {p.name}</h1>
+          <Link href={`/${lang}/brands/${brandSlug(p.brand)}`} className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold uppercase tracking-[0.12em] text-ink/60 hover:text-accent">{p.brand} <Icon name="chevron" size={14} /></Link>
+          <h1 className="mt-1 text-[22px] font-bold leading-tight md:text-[30px]">{p.brand} {p.name}</h1>
           <p className="mt-1 text-[15px] text-ink/70">{p.type[lang]} · {volumeLabel(p, lang)}</p>
           {p.rank && <span className="mt-3 inline-block rounded-full bg-surface px-3 py-1 text-[13px] font-medium">{p.rank[lang]}</span>}
 
@@ -225,7 +227,7 @@ export function ProductDetail({ p }: { p: Product }) {
             </Accordion>
             <Accordion title={t.specs}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1">
-                <dt className="text-muted">{t.brand}</dt><dd>{p.brand}</dd>
+                <dt className="text-muted">{t.brand}</dt><dd><Link href={`/${lang}/brands/${brandSlug(p.brand)}`} className="text-accent underline-offset-2 hover:underline">{p.brand}</Link></dd>
                 <dt className="text-muted">{t.volume}</dt><dd>{volumeLabel(p, lang)}</dd>
                 <dt className="text-muted">—</dt><dd>{t.daysSupply(p.daysSupply)}</dd>
               </dl>

@@ -33,13 +33,16 @@ function apply(params: Params, favorites: string[], ctx: Ctx): Product[] {
   return list;
 }
 
-export function Catalog({ params, picks }: { params: Params; picks?: { code: string; name: string; ids: string[] } | null }) {
+/** scopeBrand — каталог внутри страницы бренда: только его товары, свой баннер вместо стандартной шапки. */
+export function Catalog({ params, picks, scopeBrand, hero }: { params: Params; picks?: { code: string; name: string; ids: string[] } | null; scopeBrand?: string; hero?: React.ReactNode }) {
   const { lang, t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const hydrated = useHydrated();
   const favorites = useShop((s) => s.favorites);
-  const { products, brands, creator } = useCatalog();
+  const { products: all, brands, creator } = useCatalog();
+  const products = useMemo(() => (scopeBrand ? all.filter((p) => p.brand === scopeBrand) : all), [all, scopeBrand]);
+  const cats = scopeBrand ? CATEGORIES.filter((c) => products.some((p) => p.cat === c.id)) : CATEGORIES;
   const ctx: Ctx = useMemo(() => ({ products, creatorPicks: { ...(creator ? { [creator.code]: creator.picks } : {}), ...(picks ? { [picks.code]: picks.ids } : {}) } }), [products, creator, picks]);
   const [limit, setLimit] = useState(PAGE);
   const [sheet, setSheet] = useState(false);
@@ -66,7 +69,7 @@ export function Catalog({ params, picks }: { params: Params; picks?: { code: str
     { key: "skin" as const, label: t.skinType, opts: SKIN_TYPES.map((s) => ({ v: s.id, l: s.name[lang] })) },
     { key: "concern" as const, label: t.concern, opts: CONCERNS.map((s) => ({ v: s.id, l: s.name[lang] })) },
     { key: "brand" as const, label: t.brand, opts: brands.map((b) => ({ v: b, l: b })) },
-  ];
+  ].filter((g) => !(scopeBrand && g.key === "brand"));
   const activeChips = (["cat", "skin", "concern", "brand", "q", "fav"] as const).filter((k) => params[k]);
   const sorts = [["popular", t.sortPopular], ["new", t.sortNew], ["cheap", t.sortCheap], ["expensive", t.sortExpensive], ["rating", t.sortRating]] as const;
   const label = (k: keyof Params, v: string) => {
@@ -79,6 +82,21 @@ export function Catalog({ params, picks }: { params: Params; picks?: { code: str
 
   return (
     <div>
+      {hero ? (
+        <>
+          {hero}
+          {cats.length > 1 && (
+            <div className="wrap">
+          <div className="no-scrollbar mt-6 flex gap-2 overflow-x-auto">
+            <Link href={pathname} className={`shrink-0 rounded-full px-4 py-2 text-[14px] ${!params.cat ? "bg-ink text-white" : "bg-surface"}`}>{t.all}</Link>
+            {cats.map((c) => (
+              <button key={c.id} type="button" onClick={() => toggle("cat", c.id)} className={`shrink-0 rounded-full px-4 py-2 text-[14px] ${params.cat === c.id ? "bg-ink text-white" : "bg-surface hover:bg-line"}`}>{c.name[lang]}</button>
+            ))}
+          </div>
+            </div>
+          )}
+        </>
+      ) : (
       <div className="-mt-[72px] rounded-b-[32px] bg-surface pb-8 pt-[88px] md:-mt-[160px] md:rounded-b-block md:pb-12 md:pt-[170px]">
         <div className="wrap">
           <nav className="text-[13px] text-muted"><Link href={`/${lang}`}>{t.home}</Link> / <span>{t.catalog}</span></nav>
@@ -91,13 +109,14 @@ export function Catalog({ params, picks }: { params: Params; picks?: { code: str
           </div>
           <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto">
             <Link href={`/${lang}/catalog`} className={`shrink-0 rounded-full px-4 py-2 text-[14px] ${!params.cat ? "bg-ink text-white" : "bg-white"}`}>{t.all}</Link>
-            {CATEGORIES.map((c) => (
+            {cats.map((c) => (
               <button key={c.id} type="button" onClick={() => toggle("cat", c.id)} className={`shrink-0 rounded-full px-4 py-2 text-[14px] ${params.cat === c.id ? "bg-ink text-white" : "bg-white hover:bg-line"}`}>{c.name[lang]}</button>
             ))}
           </div>
         </div>
       </div>
 
+      )}
       <div className="wrap mt-6">
         {/* Десктоп: фильтры таблетками-дропдаунами */}
         <div className="hidden flex-wrap items-center gap-2 md:flex">

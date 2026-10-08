@@ -1,4 +1,5 @@
 "use client";
+import { brandSlug } from "@/lib/slug";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useCatalog } from "./CatalogProvider";
@@ -51,12 +52,13 @@ function BrandsPanel({ onPick }: { onPick: () => void }) {
       </div>
       <div className="mt-5 grid gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((b, i) => (
-          <Link key={b} href={`/${lang}/catalog?brand=${encodeURIComponent(b)}`} onClick={onPick} style={{ animationDelay: `${i * 18}ms` }} className="menu-item-in rounded-lg py-2 text-[16px] transition-colors hover:text-accent">
+          <Link key={b} href={`/${lang}/brands/${brandSlug(b)}`} onClick={onPick} style={{ animationDelay: `${i * 18}ms` }} className="menu-item-in rounded-lg py-2 text-[16px] transition-colors hover:text-accent">
             {b}
           </Link>
         ))}
         {list.length === 0 && <p className="text-muted">{T.nothing[lang]}</p>}
       </div>
+      <Link href={`/${lang}/brands`} onClick={onPick} className="mt-4 inline-flex h-11 items-center rounded-full bg-ink px-5 text-[15px] font-semibold text-white">{lang === "ru" ? "Все бренды →" : "Barcha brendlar →"}</Link>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import "server-only";
 import { one } from "./db";
 import type { ProductInputT } from "./product-schema";
+import { brandSlug } from "@/lib/slug";
 
 export const newProductId = (n = 0) => `p${Date.now().toString(36)}${n ? n.toString(36) : ""}`;
 
@@ -17,4 +18,6 @@ export async function upsertProduct(p: ProductInputT, id: string) {
        content=$23, sort=$24, updated_at=now()`,
     vals
   );
+  // Новый бренд в товаре — сразу заводим ему страницу.
+  await one(`INSERT INTO brands (slug, name, country) VALUES ($1, $2, '{"ru":"Южная Корея","uz":"Janubiy Koreya"}') ON CONFLICT DO NOTHING`, [brandSlug(p.brand), p.brand]);
 }
