@@ -42,7 +42,12 @@ export function FavButton({ id, className = "" }: { id: string; className?: stri
 }
 
 /** Ценник, который является кнопкой «в корзину». После добавления превращается в счётчик. */
-export function PriceButton({ p, source, size = "md", quiet = false }: { p: Product; source: string; size?: "md" | "lg"; /** без шторки «Добавлено» (например, поверх видео) */ quiet?: boolean }) {
+export function PriceButton({ p, source, size = "md", quiet = false, tone = "light" }: {
+  p: Product; source: string; size?: "md" | "lg";
+  /** без шторки «Добавлено» (например, поверх видео) */ quiet?: boolean;
+  /** glass — полупрозрачная кнопка на тёмном фоне (плеер видео) */ tone?: "light" | "glass";
+}) {
+  const plain = tone === "glass" ? "bg-white/15 text-white hover:bg-white/25" : "bg-surface hover:bg-ink hover:text-white";
   const { lang } = useI18n();
   const hydrated = useHydrated();
   // Ключ корзины: товар или товар с вариантом (выбранным или по умолчанию).
@@ -71,8 +76,8 @@ export function PriceButton({ p, source, size = "md", quiet = false }: { p: Prod
   // Объёмы с разной ценой: из карточки ведём выбирать объём, а не кладём «какой-то».
   if (!p.variant && hasPriceRange(p))
     return (
-      <Link href={`/${lang}/p/${p.slug}`} onClick={() => track("select_item", { item_id: p.id, source })} className={`flex ${h} w-fit items-center gap-1.5 rounded-full bg-surface px-3.5 transition hover:bg-ink hover:text-white`}>
-        <span className="text-[14px] text-ink/60">{lang === "ru" ? "от" : "dan"}</span>
+      <Link href={`/${lang}/p/${p.slug}`} onClick={() => track("select_item", { item_id: p.id, source })} className={`flex ${h} w-fit items-center gap-1.5 rounded-full px-3.5 transition ${plain}`}>
+        <span className={`text-[14px] ${tone === "glass" ? "text-white/70" : "text-ink/60"}`}>{lang === "ru" ? "от" : "dan"}</span>
         <span className="text-[15px] font-bold tabular md:text-[17px]">{money(p.price, lang)}</span>
       </Link>
     );
@@ -95,7 +100,7 @@ export function PriceButton({ p, source, size = "md", quiet = false }: { p: Prod
     );
   }
   return (
-    <button type="button" onClick={onAdd} className={`flex ${h} w-fit items-center gap-1.5 rounded-full bg-surface px-3.5 transition hover:bg-ink hover:text-white active:scale-95`}>
+    <button type="button" onClick={onAdd} className={`flex ${h} w-fit items-center gap-1.5 rounded-full px-3.5 transition active:scale-95 ${plain}`}>
       <Icon name="bag" size={18} />
       <span className="text-[15px] font-bold tabular md:text-[17px]">{money(p.price, lang)}</span>
     </button>

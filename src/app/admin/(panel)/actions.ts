@@ -260,7 +260,6 @@ const VideoInput = z.object({
   id: z.string().regex(/^[\w-]{1,40}$/).nullable(),
   title: z.object({ ru: z.string().trim().min(1, "Нужен заголовок").max(90), uz: z.string().trim().max(90) }),
   description: z.object({ ru: z.string().trim().max(600), uz: z.string().trim().max(600) }),
-  creatorCode: z.string().nullable(),
   src: FileUrl,
   poster: FileUrl.nullable(),
   products: z.array(z.string()).max(12, "Не больше 12 товаров"),
@@ -273,19 +272,18 @@ export async function saveVideo(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, error: "Проверьте поля", fields: fieldErrors(parsed.error) };
   const v = parsed.data;
   if (v.active && !v.products.length) return { ok: false, error: "Добавьте товары из видео", fields: { products: "Минимум 1 товар" } };
-  if (v.creatorCode && !(await one(`SELECT 1 FROM promo_codes WHERE code = $1`, [v.creatorCode]))) return { ok: false, error: "Креатор не найден", fields: { creatorCode: "Нет такого" } };
   const title = JSON.stringify({ ru: v.title.ru, uz: v.title.uz || v.title.ru });
   const desc = JSON.stringify({ ru: v.description.ru, uz: v.description.uz || v.description.ru });
   let id = v.id;
   if (id) {
-    const r = await one(`UPDATE videos SET title=$2, description=$3, creator_code=$4, src=$5, poster=$6, products=$7, active=$8, updated_at=now() WHERE id=$1 RETURNING id`, [id, title, desc, v.creatorCode, v.src, v.poster, v.products, v.active]);
+    const r = await one(`UPDATE videos SET title=$2, description=$3, src=$4, poster=$5, products=$6, active=$7, updated_at=now() WHERE id=$1 RETURNING id`, [id, title, desc, v.src, v.poster, v.products, v.active]);
     if (!r) return { ok: false, error: "Видео не найдено" };
   } else {
     id = `v${Date.now().toString(36)}`;
     await one(
-      `INSERT INTO videos (id, title, description, creator_code, src, poster, products, active, sort)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, (SELECT COALESCE(MIN(sort), 1) - 1 FROM videos))`,
-      [id, title, desc, v.creatorCode, v.src, v.poster, v.products, v.active]
+      `INSERT INTO videos (id, title, description, src, poster, products, active, sort)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, (SELECT COALESCE(MIN(sort), 1) - 1 FROM videos))`,
+      [id, title, desc, v.src, v.poster, v.products, v.active]
     );
   }
   invalidateCatalog();

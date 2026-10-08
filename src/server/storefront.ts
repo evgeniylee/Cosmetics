@@ -36,10 +36,8 @@ export async function loadStorefront(products: Product[]) {
        WHERE o.status <> 'cancelled' AND o.created_at > now() - interval '90 days' GROUP BY i.product_id`
     ),
     many<{ id: string; t: string | Date }>(`SELECT id, created_at AS t FROM products WHERE active`),
-    many<{ id: string; title: L10n; description: L10n; src: string; poster: string | null; products: string[]; code: string | null; creator_name: string | null; creator_handle: string | null; percent: number | null; photo: string | null }>(
-      `SELECT v.id, v.title, v.description, v.src, v.poster, v.products, p.code, p.creator_name, p.creator_handle, p.percent, p.photo
-       FROM videos v LEFT JOIN promo_codes p ON p.code = v.creator_code AND p.active
-       WHERE v.active ORDER BY v.sort, v.created_at DESC LIMIT 30`
+    many<{ id: string; title: L10n; description: L10n; src: string; poster: string | null; products: string[] }>(
+      `SELECT id, title, description, src, poster, products FROM videos WHERE active ORDER BY sort, created_at DESC LIMIT 30`
     ),
     many<{ code: string; creator_name: string; creator_handle: string | null; percent: number; picks: string[]; photo: string | null }>(
       `SELECT code, creator_name, creator_handle, percent, picks, photo FROM promo_codes WHERE active AND featured ORDER BY created_at LIMIT 8`
@@ -56,7 +54,6 @@ export async function loadStorefront(products: Product[]) {
   const videos: HomeVideo[] = videoRows.map((v) => ({
     id: v.id, title: v.title, description: v.description ?? { ru: "", uz: "" }, src: v.src, poster: v.poster,
     products: (v.products ?? []).filter((id) => ids.has(id)),
-    creator: v.code ? { code: v.code, name: v.creator_name!, handle: v.creator_handle, percent: v.percent!, photo: v.photo } : null,
   }));
   const creators: FeaturedCreator[] = creatorRows
     .map((c) => ({ code: c.code, name: c.creator_name, handle: c.creator_handle, percent: c.percent, photo: c.photo, picks: (c.picks ?? []).filter((id) => ids.has(id)) }))

@@ -139,78 +139,38 @@ function VideoPrice({ v, p }: { v: HomeVideo; p: Product }) {
         if (!(useShop.getState().cart[key] > 0)) { videoEvent(v.id, "cart"); track("video_add_to_cart", { video_id: v.id, item_id: p.id }); }
       }}
     >
-      <PriceButton p={p} source="video" quiet />
+      <PriceButton p={p} source="video" quiet tone="glass" />
     </div>
   );
 }
 
 const OutOfStock = ({ lang }: { lang: "ru" | "uz" }) => (
-  <span className="inline-flex h-10 items-center rounded-full bg-surface px-3.5 text-[14px] text-muted">{lang === "ru" ? "Нет в наличии" : "Mavjud emas"}</span>
+  <span className="inline-flex h-10 items-center rounded-full bg-white/10 px-3.5 text-[14px] text-white/60">{lang === "ru" ? "Нет в наличии" : "Mavjud emas"}</span>
 );
-
-function PromoChip({ v, dark = false }: { v: HomeVideo; dark?: boolean }) {
-  const { lang } = useI18n();
-  const hydrated = useHydrated();
-  const promo = useShop((s) => s.promo);
-  const setPromo = useShop((s) => s.setPromo);
-  const c = v.creator;
-  if (!c) return null;
-  const applied = hydrated && promo?.code === c.code;
-  return (
-    <div className={`flex items-center gap-2 rounded-2xl border-2 border-dashed px-3 py-2 ${dark ? "border-white/40 text-white" : "border-accent bg-white"}`}>
-      <div className="min-w-0 flex-1 leading-tight">
-        <p className={`text-[12px] ${dark ? "text-white/70" : "text-muted"}`}>{lang === "ru" ? "Промокод" : "Promokod"} −{c.percent}%</p>
-        <p className="text-[17px] font-bold tracking-wider">{c.code}</p>
-      </div>
-      <button
-        type="button"
-        disabled={applied}
-        onClick={() => { setPromo({ code: c.code, percent: c.percent }); track("promo_from_video", { code: c.code, video_id: v.id }); }}
-        className={`h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold ${applied ? (dark ? "bg-white/20" : "bg-surface text-ink") : "bg-accent text-white"}`}
-      >
-        {applied ? (lang === "ru" ? "Применён ✓" : "Qo'llandi ✓") : lang === "ru" ? "Применить" : "Qo'llash"}
-      </button>
-    </div>
-  );
-}
-
-function CreatorLine({ v, dark = false }: { v: HomeVideo; dark?: boolean }) {
-  const c = v.creator;
-  if (!c) return null;
-  return (
-    <div className="flex items-center gap-2.5">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {c.photo ? <img src={c.photo} alt="" className="size-10 rounded-full object-cover" /> : <span className="grid size-10 place-items-center rounded-full bg-accent text-[16px] font-bold text-white">{c.name.slice(0, 1)}</span>}
-      <div className="min-w-0 leading-tight">
-        <p className="truncate font-semibold">{c.name}</p>
-        {c.handle && <p className={`truncate text-[13px] ${dark ? "text-white/70" : "text-white/60"}`}>{c.handle}</p>}
-      </div>
-    </div>
-  );
-}
 
 function useVideoProducts(v: HomeVideo) {
   const { byId } = useCatalog();
   return v.products.map((id) => byId(id)).filter(Boolean) as Product[];
 }
 
-/** Правая колонка на ПК. */
+/** Правая колонка на ПК: полупрозрачные карточки товаров на тёмном фоне. */
 function ProductsPanel({ v, onNavigate }: { v: HomeVideo; onNavigate: () => void }) {
   const { lang } = useI18n();
   const items = useVideoProducts(v);
+  const open = (p: Product) => { videoEvent(v.id, "click"); track("video_product_click", { video_id: v.id, item_id: p.id }); onNavigate(); };
   return (
-    <aside className="flex max-h-[84vh] w-full max-w-[380px] flex-col rounded-[28px] bg-white p-5 text-ink">
-      <h3 className="text-[20px] font-bold">{lang === "ru" ? "Товары в видео" : "Videodagi mahsulotlar"}</h3>
-      <ul className="no-scrollbar -mx-1 mt-3 flex-1 space-y-3 overflow-y-auto px-1">
+    <aside className="flex max-h-[88vh] w-full max-w-[420px] flex-col text-white">
+      <h3 className="text-[30px] font-bold leading-tight lg:text-[36px]">{lang === "ru" ? "Товары в видео" : "Videodagi mahsulotlar"}</h3>
+      <ul className="video-scroll -mr-3 mt-5 flex-1 space-y-3 overflow-y-auto pr-3">
         {items.map((p) => (
-          <li key={p.id} className="flex gap-3">
-            <Link href={`/${lang}/p/${p.slug}`} onClick={() => { videoEvent(v.id, "click"); track("video_product_click", { video_id: v.id, item_id: p.id }); onNavigate(); }} className="size-[88px] shrink-0 overflow-hidden rounded-2xl bg-surface p-1.5">
+          <li key={p.id} className="flex gap-4 rounded-[26px] bg-black/25 p-3 pr-4 backdrop-blur-md transition hover:bg-black/35">
+            <Link href={`/${lang}/p/${p.slug}`} onClick={() => open(p)} className="size-[96px] shrink-0 overflow-hidden rounded-[18px] bg-white p-1.5">
               <ProductImage p={p} />
             </Link>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate text-[12px] text-ink/60">{p.type[lang]}</span>
-              <Link href={`/${lang}/p/${p.slug}`} onClick={() => { videoEvent(v.id, "click"); onNavigate(); }} className="line-clamp-2 text-[14px] font-medium leading-snug">{p.brand} {p.name}</Link>
-              <div className="mt-auto pt-1">{p.stock === "out" ? <OutOfStock lang={lang} /> : <VideoPrice v={v} p={p} />}</div>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-1">
+              <span className="truncate text-[13px] text-white/70">{p.type[lang]}</span>
+              <Link href={`/${lang}/p/${p.slug}`} onClick={() => open(p)} className="truncate text-[16px] font-medium">{p.brand} {p.name}</Link>
+              <div className="mt-auto pt-2">{p.stock === "out" ? <OutOfStock lang={lang} /> : <VideoPrice v={v} p={p} />}</div>
             </div>
           </li>
         ))}
@@ -227,8 +187,8 @@ function ProductsStrip({ v, onNavigate }: { v: HomeVideo; onNavigate: () => void
   return (
     <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4">
       {items.map((p) => (
-        <div key={p.id} className={`flex shrink-0 snap-start items-center gap-2.5 rounded-2xl bg-white p-2 pr-3 text-ink ${items.length === 1 ? "w-full" : "w-[82%]"}`}>
-          <Link href={`/${lang}/p/${p.slug}`} onClick={() => { videoEvent(v.id, "click"); track("video_product_click", { video_id: v.id, item_id: p.id }); onNavigate(); }} className="size-16 shrink-0 overflow-hidden rounded-xl bg-surface p-1">
+        <div key={p.id} className={`flex shrink-0 snap-start items-center gap-2.5 rounded-[20px] bg-black/40 p-2 pr-3 text-white backdrop-blur-md ${items.length === 1 ? "w-full" : "w-[82%]"}`}>
+          <Link href={`/${lang}/p/${p.slug}`} onClick={() => { videoEvent(v.id, "click"); track("video_product_click", { video_id: v.id, item_id: p.id }); onNavigate(); }} className="size-16 shrink-0 overflow-hidden rounded-xl bg-white p-1">
             <ProductImage p={p} />
           </Link>
           <div className="min-w-0 flex-1">
@@ -292,7 +252,7 @@ function Desktop({ videos, index, go, muted, setMuted, onClose, onNavigate, onIn
     </button>
   );
   return (
-    <div role="dialog" aria-modal="true" aria-label={v.title[lang]} className="anim-fade fixed inset-0 z-[80] bg-[#151515]/95 text-white backdrop-blur-sm"
+    <div role="dialog" aria-modal="true" aria-label={v.title[lang]} className="anim-fade fixed inset-0 z-[80] bg-[#3b3b3b]/85 text-white backdrop-blur-2xl"
       onWheel={(e) => {
         if (Math.abs(e.deltaY) < 30 || Date.now() - wheelAt.current < 700) return;
         if ((e.target as HTMLElement).closest("aside")) return;
@@ -303,12 +263,10 @@ function Desktop({ videos, index, go, muted, setMuted, onClose, onNavigate, onIn
         <CartPill onNavigate={onNavigate} className="h-12 px-5" />
         <button type="button" onClick={onClose} aria-label="Закрыть" className="grid size-12 place-items-center rounded-full bg-white/10 hover:bg-white/20"><Icon name="close" size={22} /></button>
       </div>
-      <div className="grid h-full grid-cols-[1fr_auto_1fr] items-center gap-8 px-8 lg:gap-12">
-        <div className="max-w-[340px] space-y-4 justify-self-end">
-          <CreatorLine v={v} />
-          <h2 className="text-[26px] font-bold leading-tight lg:text-[30px]">{v.title[lang] || v.title.ru}</h2>
-          {(v.description[lang] || v.description.ru) && <p className="whitespace-pre-line text-[15px] leading-relaxed text-white/75">{v.description[lang] || v.description.ru}</p>}
-          <PromoChip v={v} dark />
+      <div className="grid h-full grid-cols-[1fr_auto_1fr] items-start gap-8 px-8 lg:gap-12 xl:px-12">
+        <div className="max-w-[520px] space-y-5 pt-[8vh]">
+          <h2 className="text-[30px] font-bold leading-[1.1] lg:text-[40px] xl:text-[46px]">{v.title[lang] || v.title.ru}</h2>
+          {(v.description[lang] || v.description.ru) && <p className="whitespace-pre-line text-[15px] leading-relaxed text-white/80 lg:text-[17px]">{v.description[lang] || v.description.ru}</p>}
         </div>
         <div className="flex h-full flex-col items-center justify-center gap-[1.5vh]">
           <Peek x={prev} i={index - 1} pos="top" />
@@ -321,7 +279,7 @@ function Desktop({ videos, index, go, muted, setMuted, onClose, onNavigate, onIn
           </div>
           <Peek x={next} i={index + 1} pos="bottom" />
         </div>
-        <div className="justify-self-start pl-10"><ProductsPanel v={v} onNavigate={onNavigate} /></div>
+        <div className="flex h-full justify-self-start pl-10 pt-[8vh]"><ProductsPanel v={v} onNavigate={onNavigate} /></div>
       </div>
     </div>
   );
@@ -357,14 +315,12 @@ function Mobile({ videos, index, onIndex, muted, setMuted, onClose, onNavigate }
             {Math.abs(i - index) <= 1 && <Clip v={v} active={i === index} muted={muted} setMuted={setMuted} className="h-full w-full" />}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pb-[calc(20px+env(safe-area-inset-bottom,0px))] pt-24">
               <div className="pointer-events-auto space-y-3">
-                <CreatorLine v={v} dark />
                 <button type="button" onClick={() => setDesc((d) => !d)} className="block text-left">
                   <span className="block text-[17px] font-bold leading-snug">{v.title[lang] || v.title.ru}</span>
                   {(v.description[lang] || v.description.ru) && (
                     <span className={`mt-0.5 text-[14px] text-white/80 ${desc && i === index ? "block" : "line-clamp-1"}`}>{v.description[lang] || v.description.ru}</span>
                   )}
                 </button>
-                {v.creator && <PromoChip v={v} dark />}
                 <ProductsStrip v={v} onNavigate={onNavigate} />
               </div>
             </div>

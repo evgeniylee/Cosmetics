@@ -15,6 +15,5 @@ export const RAIL_RULES: Record<RailKey, string> = {
 export const RAIL_ALL: Partial<Record<RailKey, string>> = { hits: "/catalog?sort=popular", new: "/catalog?sort=new", sale: "/catalog?sale=1" };
 
 export type HomeRail = { key: RailKey; title: L10n; ids: string[] };
-export type VideoCreator = { code: string; name: string; handle: string | null; percent: number; photo: string | null };
-export type HomeVideo = { id: string; title: L10n; description: L10n; src: string; poster: string | null; products: string[]; creator: VideoCreator | null };
+export type HomeVideo = { id: string; title: L10n; description: L10n; src: string; poster: string | null; products: string[] };
 export type FeaturedCreator = { code: string; name: string; handle: string | null; percent: number; picks: string[]; photo: string | null };

@@ -9,7 +9,7 @@ import { ProductPicker, type PickOption } from "../../picker";
 
 export type VideoFormValue = {
   id: string | null; title: { ru: string; uz: string }; description: { ru: string; uz: string };
-  creatorCode: string | null; src: string; poster: string | null; products: string[]; active: boolean;
+  src: string; poster: string | null; products: string[]; active: boolean;
 };
 
 const MAX_MB = 80;
@@ -43,7 +43,7 @@ async function frameToFile(video: HTMLVideoElement) {
   return compressImage(new File([blob], "poster.jpg", { type: "image/jpeg" }), 1080);
 }
 
-export function VideoForm({ initial, options, creators }: { initial: VideoFormValue; options: PickOption[]; creators: { code: string; name: string }[] }) {
+export function VideoForm({ initial, options }: { initial: VideoFormValue; options: PickOption[] }) {
   const [f, setF] = useState(initial);
   const [local, setLocal] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -159,15 +159,9 @@ export function VideoForm({ initial, options, creators }: { initial: VideoFormVa
           <div className="grid gap-2 md:grid-cols-2">
             <label className="block"><span className="text-[13px] text-muted">Заголовок</span><input id="v-title" className={`${input} mt-1 ${errors["title.ru"] ? "border-warn" : ""}`} value={f.title.ru} maxLength={90} onChange={(e) => set("title", { ...f.title, ru: e.target.value })} placeholder="Мой уход за 3 минуты" /></label>
             <label className="block"><span className="text-[13px] text-muted">O‘zbekcha</span><input className={`${input} mt-1`} value={f.title.uz} maxLength={90} onChange={(e) => set("title", { ...f.title, uz: e.target.value })} /></label>
-            <label className="block"><span className="text-[13px] text-muted">Текст рядом с видео (необязательно)</span><textarea id="v-desc" rows={3} maxLength={600} className={`${input} mt-1 h-auto py-2`} value={f.description.ru} onChange={(e) => set("description", { ...f.description, ru: e.target.value })} /></label>
+            <label className="block"><span className="text-[13px] text-muted">Описание — слева от видео (необязательно)</span><textarea id="v-desc" rows={3} maxLength={600} className={`${input} mt-1 h-auto py-2`} value={f.description.ru} onChange={(e) => set("description", { ...f.description, ru: e.target.value })} /></label>
             <label className="block"><span className="text-[13px] text-muted">O‘zbekcha</span><textarea rows={3} maxLength={600} className={`${input} mt-1 h-auto py-2`} value={f.description.uz} onChange={(e) => set("description", { ...f.description, uz: e.target.value })} /></label>
           </div>
-          <label className="block"><span className="text-[13px] text-muted">Креатор — покажем имя и его промокод рядом с видео</span>
-            <select id="v-creator" className={`${input} mt-1`} value={f.creatorCode ?? ""} onChange={(e) => set("creatorCode", e.target.value || null)}>
-              <option value="">Без креатора (видео магазина)</option>
-              {creators.map((c) => <option key={c.code} value={c.code}>{c.name} · {c.code}</option>)}
-            </select>
-          </label>
           <label className="flex items-center gap-3 text-[15px]"><input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} className="size-5 accent-[var(--color-accent)]" />Показывать на сайте</label>
         </Card>
         <Card className="space-y-3">

@@ -399,4 +399,11 @@ INSERT INTO home_rails (key, title) VALUES
 ALTER TABLE promo_codes ADD COLUMN photo text;
 `,
   },
+  {
+    id: "009_videos_no_creator",
+    sql: `
+-- Видео — контент магазина: без привязки к креатору и без комиссии.
+ALTER TABLE videos DROP COLUMN creator_code;
+`,
+  },
 ];

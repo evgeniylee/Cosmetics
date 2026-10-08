@@ -15,9 +15,8 @@ export default async function StorefrontAdmin() {
     railRows(),
     pickOptions(),
     getPublicCatalog(),
-    many<{ id: string; title: { ru: string }; poster: string | null; active: boolean; products: string[]; creator_name: string | null; views: number; product_clicks: number; cart_adds: number }>(
-      `SELECT v.id, v.title, v.poster, v.active, v.products, p.creator_name, v.views, v.product_clicks, v.cart_adds
-       FROM videos v LEFT JOIN promo_codes p ON p.code = v.creator_code ORDER BY v.sort, v.created_at DESC`
+    many<{ id: string; title: { ru: string }; poster: string | null; active: boolean; products: string[]; views: number; product_clicks: number; cart_adds: number }>(
+      `SELECT id, title, poster, active, products, views, product_clicks, cart_adds FROM videos ORDER BY sort, created_at DESC`
     ),
     many<{ product_id: string; n: string }>(
       `SELECT i.product_id, SUM(i.qty) AS n FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.status <> 'cancelled' AND o.created_at > now() - interval '90 days' GROUP BY 1`
@@ -36,7 +35,7 @@ export default async function StorefrontAdmin() {
           <h2 className="flex-1 text-[20px] font-bold">Видео креаторов</h2>
           <Link href="/admin/storefront/videos/new" className="h-10 rounded-full bg-accent px-4 text-[14px] font-semibold leading-10 text-white">+ Видео</Link>
         </div>
-        <p className="mb-3 text-[13px] text-muted">Блок «Обзор креаторов». Нажатие на видео открывает плеер, рядом — товары из видео с кнопкой «в корзину». Порядок — как здесь.</p>
+        <p className="mb-3 text-[13px] text-muted">Блок «Обзоры» на главной. Нажатие открывает плеер: слева описание, справа товары из видео с кнопкой «в корзину». Порядок — как здесь.</p>
         {videos.length === 0 ? (
           <p className="rounded-card bg-white p-6 text-center text-muted ring-1 ring-line">Видео пока нет — блок на главной скрыт.</p>
         ) : (
@@ -49,7 +48,7 @@ export default async function StorefrontAdmin() {
                 </Link>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <Link href={`/admin/storefront/videos/${v.id}`} className="line-clamp-2 font-semibold leading-snug">{v.title.ru}</Link>
-                  <p className="truncate text-[13px] text-muted">{v.creator_name ?? "без креатора"} · {v.products.length} тов.{v.active ? "" : " · скрыто"}</p>
+                  <p className="truncate text-[13px] text-muted">{v.products.length} тов.{v.active ? "" : " · скрыто"}</p>
                   <p className="mt-0.5 line-clamp-1 text-[12px] text-muted">{v.products.map((id) => label.get(id) ?? id).join(", ")}</p>
                   <dl className="mt-auto grid grid-cols-3 gap-1 pt-2 text-[12px]">
                     <div><dt className="text-muted">Просмотры</dt><dd className="font-semibold tabular">{v.views}</dd></div>

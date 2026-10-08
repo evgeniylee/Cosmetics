@@ -196,7 +196,6 @@ export function Videos() {
               </span>
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-16 text-white md:p-4">
                 <span className="line-clamp-3 block text-[14px] font-semibold leading-snug md:text-[16px]">{v.title[lang] || v.title.ru}</span>
-                {v.creator && <span className="mt-1 block truncate text-[12px] text-white/80 md:text-[13px]">{v.creator.handle || v.creator.name}</span>}
                 {first && (
                   <span className="mt-2 flex items-center gap-1.5 rounded-full bg-white/90 p-1 pr-2.5 text-[12px] font-medium text-ink">
                     <span className="size-6 shrink-0 overflow-hidden rounded-full bg-surface"><ProductImage p={first} /></span>
