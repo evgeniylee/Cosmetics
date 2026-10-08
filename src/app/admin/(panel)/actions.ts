@@ -11,6 +11,7 @@ import { createPayout, onOrderStatus } from "@/server/creators";
 import { normalizePhone } from "@/server/auth";
 import { ProductInput, variantProblems } from "@/server/product-schema";
 import { newProductId, upsertProduct } from "@/server/products";
+import { RAIL_KEYS } from "@/lib/storefront";
 
 export type ActionResult = { ok: true; message?: string; id?: string } | { ok: false; error: string; fields?: Record<string, string> };
 
@@ -96,8 +97,9 @@ export async function uploadProductImage(form: FormData): Promise<ActionResult &
   await assertAdmin();
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false, error: "Файл не получен" };
+  const folder = form.get("folder");
   try {
-    const url = await saveUpload(file, "products");
+    const url = await saveUpload(file, folder === "videos" || folder === "creators" ? folder : "products");
     return { ok: true, url };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Не удалось сохранить файл" };
@@ -125,6 +127,7 @@ const PromoInput = z.object({
   featured: z.boolean(),
   picks: z.array(z.string()).max(8),
   creatorPhone: z.string().trim().max(30).optional(),
+  photo: z.string().regex(/^\/api\/files\/[\w./-]+$/).nullable().optional(),
   isNew: z.boolean(),
 });
 
@@ -134,17 +137,20 @@ export async function savePromo(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, error: "Проверьте поля", fields: fieldErrors(parsed.error) };
   const p = parsed.data;
   if (p.isNew && (await one(`SELECT code FROM promo_codes WHERE code = $1`, [p.code]))) return { ok: false, error: "Такой код уже есть", fields: { code: "Уже существует" } };
-  // В блоке «Выбор креаторов» на главной показываем одного креатора.
   const phone = p.creatorPhone ? normalizePhone(p.creatorPhone) : null;
   if (p.creatorPhone && !phone) return { ok: false, error: "Проверьте телефон", fields: { creatorPhone: "Формат +998 XX XXX XX XX" } };
   if (phone && (await one(`SELECT code FROM promo_codes WHERE creator_phone = $1 AND code <> $2`, [phone, p.code])))
     return { ok: false, error: "Этот номер уже привязан к другому креатору", fields: { creatorPhone: "Уже используется" } };
-  if (p.featured) await one(`UPDATE promo_codes SET featured = false WHERE code <> $1`, [p.code]);
+  // В блоке «Выбор креаторов» на главной — до 8 креаторов, листаются стрелками.
+  if (p.featured && !(await one(`SELECT 1 FROM promo_codes WHERE code = $1 AND featured`, [p.code]))) {
+    const n = await one<{ n: number }>(`SELECT count(*)::int AS n FROM promo_codes WHERE featured AND active`);
+    if ((n?.n ?? 0) >= 8) return { ok: false, error: "На главной уже 8 креаторов — снимите кого-то", fields: { featured: "Не больше 8" } };
+  }
   await one(
-    `INSERT INTO promo_codes (code, creator_name, creator_handle, percent, commission, active, featured, picks, creator_phone)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     ON CONFLICT (code) DO UPDATE SET creator_name=$2, creator_handle=$3, percent=$4, commission=$5, active=$6, featured=$7, picks=$8, creator_phone=$9`,
-    [p.code, p.creatorName, p.creatorHandle || null, p.percent, p.commission, p.active, p.featured, p.picks, phone]
+    `INSERT INTO promo_codes (code, creator_name, creator_handle, percent, commission, active, featured, picks, creator_phone, photo)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     ON CONFLICT (code) DO UPDATE SET creator_name=$2, creator_handle=$3, percent=$4, commission=$5, active=$6, featured=$7, picks=$8, creator_phone=$9, photo=$10`,
+    [p.code, p.creatorName, p.creatorHandle || null, p.percent, p.commission, p.active, p.featured, p.picks, phone, p.photo ?? null]
   );
   invalidateCatalog();
   revalidatePath("/admin/promo", "layout");
@@ -224,4 +230,89 @@ export async function saveBrand(input: unknown): Promise<ActionResult> {
   revalidatePath("/admin/brands", "layout");
   revalidatePath("/", "layout");
   return { ok: true, message: "Бренд сохранён" };
+}
+
+// ---------- Витрина: ленты главной и видео креаторов ----------
+
+const RailInput = z.object({
+  key: z.enum(RAIL_KEYS),
+  title: z.object({ ru: z.string().trim().min(1, "Нужно название").max(40), uz: z.string().trim().max(40) }),
+  active: z.boolean(),
+  mode: z.enum(["auto", "manual"]),
+  products: z.array(z.string()).max(24),
+});
+
+export async function saveRail(input: unknown): Promise<ActionResult> {
+  await assertAdmin();
+  const parsed = RailInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Проверьте поля", fields: fieldErrors(parsed.error) };
+  const r = parsed.data;
+  if (r.mode === "manual" && r.active && r.products.length < 2) return { ok: false, error: "Выберите хотя бы 2 товара или включите «авто»", fields: { products: "Минимум 2 товара" } };
+  await one(`UPDATE home_rails SET title = $2, active = $3, mode = $4, products = $5 WHERE key = $1`, [r.key, JSON.stringify({ ru: r.title.ru, uz: r.title.uz || r.title.ru }), r.active, r.mode, r.products]);
+  invalidateCatalog();
+  revalidatePath("/admin/storefront");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Лента сохранена" };
+}
+
+const FileUrl = z.string().regex(/^\/api\/files\/[\w./-]+$/, "Файл не загружен");
+const VideoInput = z.object({
+  id: z.string().regex(/^[\w-]{1,40}$/).nullable(),
+  title: z.object({ ru: z.string().trim().min(1, "Нужен заголовок").max(90), uz: z.string().trim().max(90) }),
+  description: z.object({ ru: z.string().trim().max(600), uz: z.string().trim().max(600) }),
+  creatorCode: z.string().nullable(),
+  src: FileUrl,
+  poster: FileUrl.nullable(),
+  products: z.array(z.string()).max(12, "Не больше 12 товаров"),
+  active: z.boolean(),
+});
+
+export async function saveVideo(input: unknown): Promise<ActionResult> {
+  await assertAdmin();
+  const parsed = VideoInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Проверьте поля", fields: fieldErrors(parsed.error) };
+  const v = parsed.data;
+  if (v.active && !v.products.length) return { ok: false, error: "Добавьте товары из видео", fields: { products: "Минимум 1 товар" } };
+  if (v.creatorCode && !(await one(`SELECT 1 FROM promo_codes WHERE code = $1`, [v.creatorCode]))) return { ok: false, error: "Креатор не найден", fields: { creatorCode: "Нет такого" } };
+  const title = JSON.stringify({ ru: v.title.ru, uz: v.title.uz || v.title.ru });
+  const desc = JSON.stringify({ ru: v.description.ru, uz: v.description.uz || v.description.ru });
+  let id = v.id;
+  if (id) {
+    const r = await one(`UPDATE videos SET title=$2, description=$3, creator_code=$4, src=$5, poster=$6, products=$7, active=$8, updated_at=now() WHERE id=$1 RETURNING id`, [id, title, desc, v.creatorCode, v.src, v.poster, v.products, v.active]);
+    if (!r) return { ok: false, error: "Видео не найдено" };
+  } else {
+    id = `v${Date.now().toString(36)}`;
+    await one(
+      `INSERT INTO videos (id, title, description, creator_code, src, poster, products, active, sort)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, (SELECT COALESCE(MIN(sort), 1) - 1 FROM videos))`,
+      [id, title, desc, v.creatorCode, v.src, v.poster, v.products, v.active]
+    );
+  }
+  invalidateCatalog();
+  revalidatePath("/admin/storefront", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true, message: v.id ? "Видео сохранено" : "Видео добавлено", id };
+}
+
+export async function moveVideo(id: string, dir: -1 | 1): Promise<ActionResult> {
+  await assertAdmin();
+  const list = await many<{ id: string }>(`SELECT id FROM videos ORDER BY sort, created_at DESC`);
+  const i = list.findIndex((x) => x.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return { ok: true };
+  [list[i], list[j]] = [list[j], list[i]];
+  for (const [n, x] of list.entries()) await one(`UPDATE videos SET sort = $2 WHERE id = $1`, [x.id, n]);
+  invalidateCatalog();
+  revalidatePath("/admin/storefront", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function deleteVideo(id: string): Promise<ActionResult> {
+  await assertAdmin();
+  await one(`DELETE FROM videos WHERE id = $1`, [id]);
+  invalidateCatalog();
+  revalidatePath("/admin/storefront", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Видео удалено" };
 }

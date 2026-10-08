@@ -10,7 +10,7 @@ export const metadata = { title: "Креаторы" };
 export default async function PromoPage() {
   const base = await many<Omit<PromoRow, "stats">>(
     `SELECT code, creator_name AS "creatorName", coalesce(creator_handle, '') AS "creatorHandle", coalesce(creator_phone, '') AS "creatorPhone",
-       percent, commission, active, featured, picks FROM promo_codes ORDER BY active DESC, created_at`
+       percent, commission, active, featured, picks, photo FROM promo_codes ORDER BY active DESC, created_at`
   );
   const [f30, bal] = await Promise.all([funnel(30), balances()]);
   const rows: PromoRow[] = base.map((r) => {

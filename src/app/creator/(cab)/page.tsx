@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireCreator } from "@/server/creator-auth";
 import { CLICK_WINDOW_DAYS, HOLD_DAYS, REPEAT_WINDOW_DAYS, balances, funnel, linkStats, nextPayoutDate } from "@/server/creators";
 import { fmtSum } from "@/lib/admin-format";
+import { many } from "@/server/db";
 
 export const metadata = { title: "Главная" };
 
@@ -9,7 +10,12 @@ const day = (d: Date) => d.toLocaleDateString("ru-RU", { day: "numeric", month: 
 
 export default async function CreatorHome() {
   const { creator } = await requireCreator();
-  const [bal, f30, links] = await Promise.all([balances(creator.code), funnel(30, creator.code), linkStats(creator.code, 30)]);
+  const [bal, f30, links, videos] = await Promise.all([
+    balances(creator.code), funnel(30, creator.code), linkStats(creator.code, 30),
+    many<{ id: string; title: { ru: string }; poster: string | null; active: boolean; views: number; product_clicks: number; cart_adds: number }>(
+      `SELECT id, title, poster, active, views, product_clicks, cart_adds FROM videos WHERE creator_code = $1 ORDER BY active DESC, sort`, [creator.code]
+    ),
+  ]);
   const b = bal.get(creator.code) ?? { ready: 0, hold: 0, waiting: 0, clawback: 0, paid: 0, readyOrders: 0 };
   const f = f30.get(creator.code) ?? { clicks: 0, visitors: 0, orders: 0, linkOrders: 0, revenue: 0, commission: 0, newCustomers: 0 };
   const toPay = Math.max(0, b.ready - b.clawback);
@@ -67,6 +73,28 @@ export default async function CreatorHome() {
           </ul>
         ) : <p className="mt-2 text-[14px] text-muted">Создайте первую ссылку и поставьте её в сторис — здесь появится статистика.</p>}
       </section>
+
+      {videos.length > 0 && (
+        <section className="rounded-card bg-white p-4 ring-1 ring-line">
+          <h2 className="font-bold">Ваши видео на сайте</h2>
+          <p className="mt-0.5 text-[13px] text-muted">Блок «Обзоры креаторов» на главной. Рядом с видео — ваш промокод и товары из ролика.</p>
+          <ul className="mt-3 space-y-2">
+            {videos.map((v) => (
+              <li key={v.id} className={`flex items-center gap-3 ${v.active ? "" : "opacity-60"}`}>
+                <span className="relative aspect-[9/16] w-11 shrink-0 overflow-hidden rounded-lg bg-ink">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {v.poster && <img src={v.poster} alt="" className="h-full w-full object-cover" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14px] font-medium">{v.title.ru}{v.active ? "" : " · снято с сайта"}</p>
+                  <p className="text-[12px] text-muted tabular">{v.views} просм. · {v.product_clicks} переходов на товар · {v.cart_adds} в корзину</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[12px] text-muted">Заказ засчитывается вам, если покупатель применил ваш промокод (в плеере есть кнопка «Применить»).</p>
+        </section>
+      )}
 
       <details className="rounded-card bg-white p-4 ring-1 ring-line [&_summary::-webkit-details-marker]:hidden">
         <summary className="cursor-pointer list-none font-bold">Как начисляется заработок ↓</summary>

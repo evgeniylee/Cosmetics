@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin", label: "Сводка", icon: "home", exact: true },
   { href: "/admin/orders", label: "Заказы", icon: "bag", badge: true },
   { href: "/admin/products", label: "Товары", icon: "jar" },
+  { href: "/admin/storefront", label: "Витрина", icon: "spark" },
   { href: "/admin/brands", label: "Бренды", icon: "star" },
   { href: "/admin/customers", label: "Клиенты", icon: "user" },
   { href: "/admin/promo", label: "Креаторы", icon: "gift" },
@@ -19,11 +20,11 @@ export function AdminNav({ mobile = false, fresh = 0 }: { mobile?: boolean; fres
   if (mobile)
     return (
       <nav className="fixed inset-x-2 bottom-[calc(8px+env(safe-area-inset-bottom,0px))] z-40 md:hidden" aria-label="Админка">
-        <ul className="grid grid-cols-6 rounded-card border border-line bg-white/95 py-1.5 shadow-float backdrop-blur-md">
+        <ul className="grid grid-cols-7 rounded-card border border-line bg-white/95 py-1.5 shadow-float backdrop-blur-md">
           {ITEMS.map((it) => (
             <li key={it.href}>
-              <Link href={it.href} className={`relative flex flex-col items-center gap-0.5 py-1 text-[11px] ${active(it) ? "text-accent" : "text-ink/70"}`}>
-                <span className={`grid h-8 w-10 place-items-center rounded-xl ${active(it) ? "bg-accent-soft" : ""}`}><Icon name={it.icon} size={21} /></span>
+              <Link href={it.href} className={`relative flex flex-col items-center gap-0.5 py-1 text-[10px] ${active(it) ? "text-accent" : "text-ink/70"}`}>
+                <span className={`grid h-8 w-9 place-items-center rounded-xl ${active(it) ? "bg-accent-soft" : ""}`}><Icon name={it.icon} size={21} /></span>
                 {it.label}
                 {it.badge && fresh > 0 && <span className="absolute right-2 top-0 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-white tabular">{fresh}</span>}
               </Link>

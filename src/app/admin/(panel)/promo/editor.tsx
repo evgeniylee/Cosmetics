@@ -2,11 +2,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { fmtSum } from "@/lib/admin-format";
-import { savePromo } from "../actions";
+import { compressImage } from "@/lib/compress-image";
+import { savePromo, uploadProductImage } from "../actions";
 import { Card, Toast } from "../ui";
 
 export type PromoRow = {
-  code: string; creatorName: string; creatorHandle: string; creatorPhone: string; percent: number; commission: number; active: boolean; featured: boolean; picks: string[];
+  code: string; creatorName: string; creatorHandle: string; creatorPhone: string; percent: number; commission: number; active: boolean; featured: boolean; picks: string[]; photo: string | null;
   stats: { visitors: number; orders: number; revenue: number; newCustomers: number; toPay: number; pending: number };
 };
 export type Form = Omit<PromoRow, "stats"> & { isNew: boolean };
@@ -15,7 +16,7 @@ const input = "h-11 w-full rounded-xl border border-line bg-white px-3 text-[15p
 
 export function PromoList({ rows, products }: { rows: PromoRow[]; products: { id: string; label: string }[] }) {
   const [edit, setEdit] = useState<Form | null>(null);
-  const blank: Form = { code: "", creatorName: "", creatorHandle: "", creatorPhone: "", percent: 10, commission: 7, active: true, featured: false, picks: [], isNew: true };
+  const blank: Form = { code: "", creatorName: "", creatorHandle: "", creatorPhone: "", percent: 10, commission: 7, active: true, featured: false, picks: [], photo: null, isNew: true };
   return (
     <div className="space-y-3 px-4 md:px-8">
       <button type="button" onClick={() => setEdit(blank)} className="h-11 rounded-full bg-accent px-5 font-semibold text-white">+ Новый промокод</button>
@@ -66,6 +67,7 @@ export function Editor({ initial, products, onClose }: { initial: Form; products
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [photoBusy, setPhotoBusy] = useState(false);
   const router = useRouter();
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((s) => ({ ...s, [k]: v }));
   const margin = f.percent + f.commission;
@@ -99,7 +101,26 @@ export function Editor({ initial, products, onClose }: { initial: Form; products
           С каждого заказа по коду уходит {margin}% выручки (скидка + комиссия).{margin > 25 ? " Проверьте, что маржа товаров это выдерживает." : ""}
         </p>
         <label className="flex items-center gap-3 text-[15px]"><input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} className="size-5 accent-[var(--color-accent)]" />Код работает</label>
-        <label className="flex items-center gap-3 text-[15px]"><input type="checkbox" checked={f.featured} onChange={(e) => set("featured", e.target.checked)} className="size-5 accent-[var(--color-accent)]" />Показывать подборку на главной (один креатор)</label>
+        <label className="flex items-center gap-3 text-[15px]"><input type="checkbox" checked={f.featured} onChange={(e) => set("featured", e.target.checked)} className="size-5 accent-[var(--color-accent)]" />Показывать подборку на главной («Выбор креаторов», до 8 человек)</label>
+        {errors.featured && <p className="text-[12px] text-warn">{errors.featured}</p>}
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {f.photo ? <img src={f.photo} alt="" className="h-20 w-16 rounded-xl object-cover ring-1 ring-line" /> : <span className="grid h-20 w-16 place-items-center rounded-xl bg-surface text-[11px] text-muted">нет фото</span>}
+          <div className="text-[13px]">
+            <p className="text-muted">Фото креатора для главной и видео. Вертикальное, лицо по центру.</p>
+            <div className="mt-1 flex gap-3">
+              <label className="cursor-pointer text-accent underline">{photoBusy ? "Загружаем…" : f.photo ? "Заменить" : "Загрузить"}
+                <input type="file" accept="image/*" className="hidden" disabled={photoBusy} onChange={async (e) => {
+                  const x = e.target.files?.[0]; e.target.value = ""; if (!x) return;
+                  setPhotoBusy(true);
+                  try { const fd = new FormData(); fd.set("file", await compressImage(x, 1000)); fd.set("folder", "creators"); const r = await uploadProductImage(fd); if (r.ok && r.url) set("photo", r.url); else setMsg(r.ok ? "Не удалось" : r.error); }
+                  catch { setMsg("Не удалось загрузить фото"); } finally { setPhotoBusy(false); }
+                }} />
+              </label>
+              {f.photo && <button type="button" onClick={() => set("photo", null)} className="text-muted">Убрать</button>}
+            </div>
+          </div>
+        </div>
         <div>
           <p className="text-[13px] text-muted">Подборка креатора, до 8 товаров</p>
           <div className="mt-1 max-h-48 space-y-1 overflow-y-auto rounded-xl p-2 ring-1 ring-line">

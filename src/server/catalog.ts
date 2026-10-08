@@ -4,6 +4,8 @@ import "server-only";
 import type { CategoryId, Concern, L10n, Pack, Product, SkinType, Variant, VariantKind } from "@/data/catalog";
 import { parseKey, withVariant } from "@/lib/variants";
 import { many } from "./db";
+import { loadStorefront } from "./storefront";
+import type { FeaturedCreator, HomeRail, HomeVideo } from "@/lib/storefront";
 
 export type ProductRow = {
   id: string;
@@ -109,11 +111,17 @@ export function rowToProduct(r: ProductRow): Product {
   };
 }
 
-export type FeaturedCreator = { code: string; name: string; handle: string | null; percent: number; picks: string[] };
-export type PublicCatalog = { products: Product[]; brands: string[]; creator: FeaturedCreator | null };
+export type { FeaturedCreator };
+export type PublicCatalog = {
+  products: Product[]; brands: string[];
+  /** Первый креатор для старых мест (фильтр каталога). */
+  creator: FeaturedCreator | null;
+  creators: FeaturedCreator[]; rails: HomeRail[]; videos: HomeVideo[];
+};
 
 declare global {
   var __nabiCatalog: Promise<PublicCatalog> | undefined;
+  var __nabiCatalogAt: number | undefined;
 }
 
 async function load(): Promise<PublicCatalog> {
@@ -121,17 +129,16 @@ async function load(): Promise<PublicCatalog> {
   const vmap = await variantsFor(rows.filter((r) => r.variant_kind).map((r) => r.id));
   const products = rows.map((r) => attachVariants(rowToProduct(r), r.variant_kind, vmap.get(r.id)));
   const brands = Array.from(new Set(products.map((p) => p.brand))).sort((a, b) => a.localeCompare(b));
-  const cr = await many<{ code: string; creator_name: string; creator_handle: string | null; percent: number; picks: string[] }>(
-    `SELECT code, creator_name, creator_handle, percent, picks FROM promo_codes WHERE active AND featured ORDER BY created_at LIMIT 1`
-  );
-  const creator = cr[0]
-    ? { code: cr[0].code, name: cr[0].creator_name, handle: cr[0].creator_handle, percent: cr[0].percent, picks: (cr[0].picks ?? []).filter((id) => products.some((p) => p.id === id)) }
-    : null;
-  return { products, brands, creator };
+  const { rails, videos, creators } = await loadStorefront(products);
+  return { products, brands, creator: creators[0] ?? null, creators, rails, videos };
 }
 
+// Хиты считаются по продажам, поэтому кэш живёт не дольше 10 минут, даже без правок в админке.
+const TTL = 10 * 60_000;
+
 export function getPublicCatalog(): Promise<PublicCatalog> {
-  if (!globalThis.__nabiCatalog) {
+  if (!globalThis.__nabiCatalog || Date.now() - (globalThis.__nabiCatalogAt ?? 0) > TTL) {
+    globalThis.__nabiCatalogAt = Date.now();
     globalThis.__nabiCatalog = load().catch((e) => {
       globalThis.__nabiCatalog = undefined;
       throw e;

@@ -42,7 +42,7 @@ export function FavButton({ id, className = "" }: { id: string; className?: stri
 }
 
 /** Ценник, который является кнопкой «в корзину». После добавления превращается в счётчик. */
-export function PriceButton({ p, source, size = "md" }: { p: Product; source: string; size?: "md" | "lg" }) {
+export function PriceButton({ p, source, size = "md", quiet = false }: { p: Product; source: string; size?: "md" | "lg"; /** без шторки «Добавлено» (например, поверх видео) */ quiet?: boolean }) {
   const { lang } = useI18n();
   const hydrated = useHydrated();
   // Ключ корзины: товар или товар с вариантом (выбранным или по умолчанию).
@@ -80,7 +80,7 @@ export function PriceButton({ p, source, size = "md" }: { p: Product; source: st
   const onAdd = () => {
     if (p.stock === "out") return;
     add(key);
-    setAdded(key);
+    if (!quiet) setAdded(key);
     track("add_to_cart", { item_id: p.id, price: p.price, qty: 1, source });
   };
 

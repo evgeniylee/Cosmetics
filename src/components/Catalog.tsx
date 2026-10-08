@@ -11,7 +11,7 @@ import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { ProductCard } from "./ProductCard";
 
-type Params = { cat?: string; skin?: string; concern?: string; brand?: string; q?: string; sort?: string; fav?: string; creator?: string };
+type Params = { cat?: string; skin?: string; concern?: string; brand?: string; q?: string; sort?: string; fav?: string; creator?: string; sale?: string };
 const PAGE = 8;
 
 type Ctx = { products: Product[]; creatorPicks: Record<string, string[]> };
@@ -23,6 +23,7 @@ function apply(params: Params, favorites: string[], ctx: Ctx): Product[] {
   if (params.concern) list = list.filter((p) => p.concerns.includes(params.concern as never));
   if (params.brand) list = list.filter((p) => p.brand === params.brand);
   if (params.fav) list = list.filter((p) => favorites.includes(p.id));
+  if (params.sale) list = list.filter((p) => p.oldPrice && p.oldPrice > p.price);
   if (params.creator) list = list.filter((p) => (ctx.creatorPicks[params.creator!.toUpperCase()] ?? []).includes(p.id));
   const s = params.sort || (params.q ? "relevance" : "popular");
   if (s === "popular") list.sort((a, b) => b.reviews - a.reviews);
@@ -64,15 +65,16 @@ export function Catalog({ params, picks, scopeBrand, hero }: { params: Params; p
   };
 
   const category = CATEGORIES.find((c) => c.id === params.cat);
-  const title = params.q ? `«${params.q}»` : params.fav ? t.favorites : category ? category.name[lang] : params.creator && picks ? (lang === "uz" ? `${picks.name} tanlovi` : `Выбор: ${picks.name}`) : t.catalog;
+  const title = params.q ? `«${params.q}»` : params.fav ? t.favorites : params.sale && !category ? (lang === "uz" ? "Chegirmalar" : "Скидки") : category ? category.name[lang] : params.creator && picks ? (lang === "uz" ? `${picks.name} tanlovi` : `Выбор: ${picks.name}`) : t.catalog;
   const groups = [
     { key: "skin" as const, label: t.skinType, opts: SKIN_TYPES.map((s) => ({ v: s.id, l: s.name[lang] })) },
     { key: "concern" as const, label: t.concern, opts: CONCERNS.map((s) => ({ v: s.id, l: s.name[lang] })) },
     { key: "brand" as const, label: t.brand, opts: brands.map((b) => ({ v: b, l: b })) },
   ].filter((g) => !(scopeBrand && g.key === "brand"));
-  const activeChips = (["cat", "skin", "concern", "brand", "q", "fav"] as const).filter((k) => params[k]);
+  const activeChips = (["cat", "skin", "concern", "brand", "q", "fav", "sale"] as const).filter((k) => params[k]);
   const sorts = [["popular", t.sortPopular], ["new", t.sortNew], ["cheap", t.sortCheap], ["expensive", t.sortExpensive], ["rating", t.sortRating]] as const;
   const label = (k: keyof Params, v: string) => {
+    if (k === "sale") return lang === "uz" ? "Chegirmalar" : "Со скидкой";
     if (k === "cat") return CATEGORIES.find((c) => c.id === v)?.name[lang];
     if (k === "skin") return SKIN_TYPES.find((c) => c.id === v)?.name[lang];
     if (k === "concern") return CONCERNS.find((c) => c.id === v)?.name[lang];

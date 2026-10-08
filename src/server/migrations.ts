@@ -359,4 +359,44 @@ CREATE INDEX product_variants_product ON product_variants(product_id, sort);
 ALTER TABLE order_items ADD COLUMN variant_id text, ADD COLUMN variant_name text;
 `,
   },
+  {
+    id: "008_storefront",
+    sql: `
+-- Видео креаторов с товарами («Обзор креаторов» на главной).
+CREATE TABLE videos (
+  id text PRIMARY KEY,
+  title jsonb NOT NULL,                       -- {ru, uz}
+  description jsonb NOT NULL DEFAULT '{}',    -- {ru, uz}
+  creator_code text REFERENCES promo_codes(code) ON UPDATE CASCADE ON DELETE SET NULL,
+  src text NOT NULL,
+  poster text,
+  products text[] NOT NULL DEFAULT '{}',      -- товары в видео, по порядку
+  active boolean NOT NULL DEFAULT true,
+  sort integer NOT NULL DEFAULT 0,
+  views integer NOT NULL DEFAULT 0,           -- смотрели ≥2 с (раз за сессию)
+  product_clicks integer NOT NULL DEFAULT 0,  -- переходы на товар из видео
+  cart_adds integer NOT NULL DEFAULT 0,       -- добавления в корзину из видео
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX videos_sort ON videos(active, sort);
+
+-- Продающие ленты главной: авто (по правилу) или товары вручную.
+CREATE TABLE home_rails (
+  key text PRIMARY KEY,                       -- hits | new | sale | recommended
+  title jsonb NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  mode text NOT NULL DEFAULT 'auto',          -- auto | manual
+  products text[] NOT NULL DEFAULT '{}'
+);
+INSERT INTO home_rails (key, title) VALUES
+('hits', '{"ru":"Хиты","uz":"Xitlar"}'),
+('new', '{"ru":"Новинки","uz":"Yangiliklar"}'),
+('sale', '{"ru":"Скидки","uz":"Chegirmalar"}'),
+('recommended', '{"ru":"Рекомендуем","uz":"Tavsiya qilamiz"}');
+
+-- Фото креатора для блока «Выбор креаторов»; на главной теперь может быть несколько креаторов.
+ALTER TABLE promo_codes ADD COLUMN photo text;
+`,
+  },
 ];

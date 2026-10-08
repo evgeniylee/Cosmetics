@@ -1,7 +1,8 @@
-import { Brands, ContinueShopping, CreatorsPick, Hits, QuickCategories, QuizBanner, Seo, Subscribe, Trust, Videos } from "@/components/HomeBlocks";
+import { Brands, ContinueShopping, CreatorsPick, HomeRail, QuickCategories, QuizBanner, Seo, Subscribe, Trust, Videos } from "@/components/HomeBlocks";
 import { HeroCarousel } from "@/components/HeroCarousel";
 
-// Порядок секций главной (см. промт, раздел 2.3).
+// Порядок секций главной. Ленты (хиты, новинки, скидки, рекомендуем) и видео настраиваются в админке «Витрина»;
+// пустой блок не показывается.
 export default function Home() {
   return (
     <>
@@ -9,10 +10,13 @@ export default function Home() {
       <HeroCarousel />
       <QuickCategories />
       <ContinueShopping />
-      <Hits />
-      <QuizBanner />
-      <CreatorsPick />
+      <HomeRail k="hits" />
       <Videos />
+      <HomeRail k="new" />
+      <QuizBanner />
+      <HomeRail k="sale" />
+      <CreatorsPick />
+      <HomeRail k="recommended" />
       <Trust />
       <Brands />
       <Subscribe />
