@@ -2,7 +2,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { api } from "@/lib/api";
-import { captureAttribution, track } from "@/lib/analytics";
+import { captureAttribution, track, visitSource } from "@/lib/analytics";
 import { useSession, useShop } from "@/store/shop";
 
 export function Attribution() {
@@ -18,7 +18,12 @@ export function Attribution() {
         .then((p) => { if (p?.code) { useShop.getState().setPromo({ code: p.code, percent: p.percent }); track("promo_from_link", { code: p.code }); } })
         .catch(() => {});
     // Подтягиваем клиента из серверной сессии один раз при загрузке.
-    api.me().then((r) => setCustomer(r.customer)).catch(() => setCustomer(null));
+    const src = visitSource();
+    api.me().then((r) => {
+      setCustomer(r.customer);
+      // Визит вошедшего клиента — для CRM.
+      if (r.customer) fetch("/api/me/visit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ src }), keepalive: true }).catch(() => {});
+    }).catch(() => setCustomer(null));
   }, [setCustomer]);
   useEffect(() => track("page_view", { path: pathname }), [pathname]);
   return null;

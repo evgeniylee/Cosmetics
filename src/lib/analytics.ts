@@ -50,3 +50,19 @@ export function attribution(): Props {
     return {};
   }
 }
+
+/** Откуда пришёл этот визит (для CRM): креатор, метка рекламы, сайт-источник или «прямой». Без персональных данных. */
+export function visitSource(): string {
+  try {
+    const u = new URL(window.location.href);
+    const promo = u.searchParams.get("promo");
+    const utm = u.searchParams.get("utm_source");
+    if (utm === "creator" && promo) return `creator:${promo.toUpperCase().slice(0, 20)}`;
+    if (utm) return `utm:${utm.replace(/[^\w.-]/g, "").slice(0, 40)}`;
+    if (document.referrer) {
+      const h = new URL(document.referrer).hostname.replace(/^www\./, "");
+      if (h && h !== window.location.hostname) return h.slice(0, 60);
+    }
+  } catch {}
+  return "direct";
+}

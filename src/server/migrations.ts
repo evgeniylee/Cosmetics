@@ -406,4 +406,31 @@ ALTER TABLE promo_codes ADD COLUMN photo text;
 ALTER TABLE videos DROP COLUMN creator_code;
 `,
   },
+  {
+    id: "010_crm",
+    sql: `
+-- CRM: активность клиента, просмотры товаров, метки и задачи менеджера.
+ALTER TABLE customers ADD COLUMN last_seen_at timestamptz, ADD COLUMN visits_count integer NOT NULL DEFAULT 0,
+  ADD COLUMN tags text[] NOT NULL DEFAULT '{}';
+CREATE TABLE customer_product_views (
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  product_id text NOT NULL,
+  views integer NOT NULL DEFAULT 1,
+  last_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (customer_id, product_id)
+);
+CREATE INDEX customer_product_views_last ON customer_product_views(customer_id, last_at DESC);
+CREATE TABLE crm_tasks (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  due date NOT NULL,
+  text text NOT NULL,
+  by_phone text,
+  done_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX crm_tasks_open ON crm_tasks(due) WHERE done_at IS NULL;
+CREATE INDEX customer_events_type ON customer_events(type, created_at);
+`,
+  },
 ];

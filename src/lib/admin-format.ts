@@ -24,3 +24,10 @@ export const fmtPhone = (p: string) => p.replace(/^\+998(\d{2})(\d{3})(\d{2})(\d
 
 export const fmtDate = (d: string | Date, withTime = true) =>
   new Date(d).toLocaleString("ru-RU", { timeZone: "Asia/Tashkent", day: "2-digit", month: "2-digit", year: withTime ? undefined : "numeric", ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}) });
+
+/** «сегодня», «вчера», «5 дн. назад» */
+export function ago(d: string | Date | null) {
+  if (!d) return null;
+  const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+  return days <= 0 ? "сегодня" : days === 1 ? "вчера" : `${days} дн. назад`;
+}

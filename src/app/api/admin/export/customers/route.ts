@@ -1,6 +1,7 @@
 import { many } from "@/server/db";
 import { CITIES } from "@/lib/shop";
 import { adminOnly, buildSheet, tz, xlsxResponse, type Col } from "@/server/xlsx";
+import { SEGMENTS, customerWhere } from "@/server/crm";
 
 export const dynamic = "force-dynamic";
 
@@ -8,14 +9,18 @@ type R = {
   phone: string; first_name: string | null; last_name: string | null; birth_date: string | null; lang: string; city: string | null;
   marketing_opt_in: boolean; orders_count: number; total_spent: string; last_order_at: string | null; created_at: string;
   first_creator_code: string | null; first_utm: Record<string, string> | null; manager_note: string | null;
+  last_seen_at: string | null; visits_count: number; tags: string[];
 };
 
-export async function GET() {
+// Выгрузка учитывает текущий фильтр списка: ?seg=abandoned&tag=оптовик&q=…
+export async function GET(req: Request) {
   return adminOnly(async () => {
+    const sp = Object.fromEntries(new URL(req.url).searchParams);
+    const { seg, sql, params } = customerWhere(sp);
     const rows = await many<R>(
-      `SELECT phone, first_name, last_name, to_char(birth_date, 'DD.MM.YYYY') AS birth_date, lang, city, marketing_opt_in, orders_count, total_spent,
-         last_order_at, created_at, first_creator_code, first_utm, manager_note
-       FROM customers WHERE first_name IS NOT NULL OR orders_count > 0 ORDER BY created_at DESC`
+      `SELECT c.phone, c.first_name, c.last_name, to_char(c.birth_date, 'DD.MM.YYYY') AS birth_date, c.lang, c.city, c.marketing_opt_in, c.orders_count, c.total_spent,
+         c.last_order_at, c.created_at, c.first_creator_code, c.first_utm, c.manager_note, c.last_seen_at, c.visits_count, c.tags
+       FROM customers c ${sql} ORDER BY c.created_at DESC`, params
     );
     const cols: Col<R>[] = [
       { header: "Имя", key: "fn", width: 16, value: (r) => r.first_name },
@@ -31,8 +36,11 @@ export async function GET() {
       { header: "Согласие на рассылку", key: "mk", width: 12, value: (r) => (r.marketing_opt_in ? "да" : "нет") },
       { header: "Первый промокод", key: "cc", width: 14, value: (r) => r.first_creator_code },
       { header: "utm_source", key: "src", value: (r) => r.first_utm?.utm_source },
+      { header: "Последний визит", key: "ls", width: 17, date: true, value: (r) => tz(r.last_seen_at) },
+      { header: "Визитов", key: "vc", width: 9, value: (r) => r.visits_count },
+      { header: "Метки", key: "tags", width: 20, value: (r) => (r.tags ?? []).join(", ") },
       { header: "Заметка", key: "note", width: 30, value: (r) => r.manager_note },
     ];
-    return xlsxResponse(await buildSheet("Клиенты", cols, rows), "nabi-customers");
+    return xlsxResponse(await buildSheet(seg === "all" ? "Клиенты" : SEGMENTS[seg].l.slice(0, 30), cols, rows), `nabi-customers${seg === "all" ? "" : `-${seg}`}`);
   });
 }

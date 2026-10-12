@@ -44,8 +44,14 @@ export async function PUT(req: Request) {
     for (const [id, q] of Object.entries(saved.cart)) cart[id] = Math.max(cart[id] ?? 0, q);
     favorites = [...new Set([...saved.favorites, ...favorites])];
   }
-  await one(`DELETE FROM customer_cart WHERE customer_id = $1`, [me.id]);
-  for (const [id, q] of Object.entries(cart)) await one(`INSERT INTO customer_cart (customer_id, product_id, qty) VALUES ($1, $2, $3)`, [me.id, id, Math.min(q, 50)]);
+  // Обновляем построчно: время меняется только у изменённых позиций — по нему CRM видит «брошенную корзину».
+  await one(`DELETE FROM customer_cart WHERE customer_id = $1 AND NOT (product_id = ANY($2::text[]))`, [me.id, Object.keys(cart)]);
+  for (const [id, q] of Object.entries(cart))
+    await one(
+      `INSERT INTO customer_cart (customer_id, product_id, qty) VALUES ($1, $2, $3)
+       ON CONFLICT (customer_id, product_id) DO UPDATE SET qty = EXCLUDED.qty, updated_at = now() WHERE customer_cart.qty <> EXCLUDED.qty`,
+      [me.id, id, Math.min(q, 50)]
+    );
   await one(`DELETE FROM customer_favorites WHERE customer_id = $1 AND NOT (product_id = ANY($2::text[]))`, [me.id, favorites]);
   for (const id of favorites) await one(`INSERT INTO customer_favorites (customer_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [me.id, id]);
   return NextResponse.json({ cart, favorites });

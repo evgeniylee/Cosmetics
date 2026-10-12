@@ -12,6 +12,7 @@ import { normalizePhone } from "@/server/auth";
 import { ProductInput, variantProblems } from "@/server/product-schema";
 import { newProductId, upsertProduct } from "@/server/products";
 import { RAIL_KEYS } from "@/lib/storefront";
+import { TAGS } from "@/server/crm";
 
 export type ActionResult = { ok: true; message?: string; id?: string } | { ok: false; error: string; fields?: Record<string, string> };
 
@@ -113,6 +114,36 @@ export async function saveCustomerNote(customerId: string, note: string): Promis
   await one(`UPDATE customers SET manager_note = $2, updated_at = now() WHERE id = $1`, [customerId, note.trim().slice(0, 2000) || null]);
   revalidatePath(`/admin/customers/${customerId}`);
   return { ok: true, message: "Заметка сохранена" };
+}
+
+export async function setCustomerTags(customerId: string, tags: string[]): Promise<ActionResult> {
+  await assertAdmin();
+  const clean = [...new Set(tags.filter((t) => (TAGS as readonly string[]).includes(t)))];
+  await one(`UPDATE customers SET tags = $2, updated_at = now() WHERE id = $1`, [customerId, clean]);
+  revalidatePath(`/admin/customers/${customerId}`);
+  return { ok: true, message: "Метки сохранены" };
+}
+
+export async function addCrmTask(customerId: string, due: string, text: string): Promise<ActionResult> {
+  const me = await assertAdmin();
+  const t = text.trim().slice(0, 300);
+  if (!t) return { ok: false, error: "Напишите, что сделать" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return { ok: false, error: "Укажите дату" };
+  await one(`INSERT INTO crm_tasks (customer_id, due, text, by_phone) VALUES ($1, $2, $3, $4)`, [customerId, due, t, me.phone]);
+  await one(`INSERT INTO customer_events (customer_id, type, data) VALUES ($1, 'task_added', $2)`, [customerId, JSON.stringify({ text: t, due })]);
+  revalidatePath(`/admin/customers/${customerId}`);
+  revalidatePath("/admin/customers");
+  return { ok: true, message: "Задача добавлена" };
+}
+
+export async function setCrmTaskDone(taskId: string, done: boolean): Promise<ActionResult> {
+  await assertAdmin();
+  const t = await one<{ customer_id: string; text: string }>(`UPDATE crm_tasks SET done_at = ${done ? "now()" : "NULL"} WHERE id = $1 RETURNING customer_id, text`, [taskId]);
+  if (!t) return { ok: false, error: "Задача не найдена" };
+  if (done) await one(`INSERT INTO customer_events (customer_id, type, data) VALUES ($1, 'task_done', $2)`, [t.customer_id, JSON.stringify({ text: t.text })]);
+  revalidatePath(`/admin/customers/${t.customer_id}`);
+  revalidatePath("/admin/customers");
+  return { ok: true };
 }
 
 // ---------- Промокоды ----------

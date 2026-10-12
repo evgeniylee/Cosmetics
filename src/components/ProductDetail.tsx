@@ -8,7 +8,7 @@ import { useCatalog } from "./CatalogProvider";
 import { catName } from "@/lib/search";
 import { fmtCountdown, money, msToCutoff, unitPrice, volumeLabel } from "@/lib/shop";
 import { track } from "@/lib/analytics";
-import { useHydrated, useShop, useUi } from "@/store/shop";
+import { useHydrated, useShop, useUi, useSession } from "@/store/shop";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 import { Badge, FavButton, PriceButton, ProductCard, Stars } from "./ProductCard";
@@ -170,6 +170,11 @@ export function ProductDetail({ p: base, initialVariant }: { p: Product; initial
     viewed(p.id);
     track("view_item", { item_id: p.id, price: p.price, category: p.cat });
   }, [p.id, p.price, p.cat, viewed]);
+  // Вошедший клиент: просмотр попадает в его карточку в CRM.
+  const customerId = useSession((s) => s.customer?.id);
+  useEffect(() => {
+    if (customerId) fetch("/api/me/view", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pid: p.id }), keepalive: true }).catch(() => {});
+  }, [p.id, customerId]);
 
   useEffect(() => {
     const el = buyRef.current;
