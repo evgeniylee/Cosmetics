@@ -1,11 +1,11 @@
 // Каталог из базы. Витрина получает его один раз на запрос через getPublicCatalog() (кэш в памяти
 // процесса, сбрасывается при любом изменении в админке).
 import "server-only";
-import type { CategoryId, Concern, L10n, Pack, Product, SkinType, Variant, VariantKind } from "@/data/catalog";
+import type { AboutBlock, CategoryId, Concern, L10n, Pack, Product, SkinType, Variant, VariantKind } from "@/data/catalog";
 import { parseKey, withVariant } from "@/lib/variants";
 import { many } from "./db";
 import { loadStorefront } from "./storefront";
-import type { FeaturedCreator, HomeRail, HomeVideo } from "@/lib/storefront";
+import type { FeaturedCreator, HeroBanner, HomeRail, HomeVideo } from "@/lib/storefront";
 
 export type ProductRow = {
   id: string;
@@ -37,6 +37,7 @@ export type ProductRow = {
     howTo?: L10n;
     ingredients?: L10n[];
     reviewSummary?: L10n | null;
+    about?: AboutBlock[];
     rank?: L10n | null;
   };
   sort: number;
@@ -105,6 +106,7 @@ export function rowToProduct(r: ProductRow): Product {
     howTo: c.howTo ?? E,
     ingredients: c.ingredients ?? [],
     reviewSummary: c.reviewSummary ?? undefined,
+    about: c.about ?? [],
     fbt: r.fbt ?? [],
     images: r.images ?? [],
     stock: r.stock as Product["stock"],
@@ -116,7 +118,7 @@ export type PublicCatalog = {
   products: Product[]; brands: string[];
   /** Первый креатор для старых мест (фильтр каталога). */
   creator: FeaturedCreator | null;
-  creators: FeaturedCreator[]; rails: HomeRail[]; videos: HomeVideo[];
+  creators: FeaturedCreator[]; rails: HomeRail[]; videos: HomeVideo[]; banners: HeroBanner[];
 };
 
 declare global {
@@ -129,8 +131,8 @@ async function load(): Promise<PublicCatalog> {
   const vmap = await variantsFor(rows.filter((r) => r.variant_kind).map((r) => r.id));
   const products = rows.map((r) => attachVariants(rowToProduct(r), r.variant_kind, vmap.get(r.id)));
   const brands = Array.from(new Set(products.map((p) => p.brand))).sort((a, b) => a.localeCompare(b));
-  const { rails, videos, creators } = await loadStorefront(products);
-  return { products, brands, creator: creators[0] ?? null, creators, rails, videos };
+  const { rails, videos, creators, banners } = await loadStorefront(products);
+  return { products, brands, creator: creators[0] ?? null, creators, rails, videos, banners };
 }
 
 // Хиты считаются по продажам, поэтому кэш живёт не дольше 10 минут, даже без правок в админке.

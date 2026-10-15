@@ -5,13 +5,19 @@ import { autoRail, pickOptions, railRows } from "@/server/storefront";
 import { RAIL_RULES } from "@/lib/storefront";
 import { PageHead } from "../ui";
 import { RailEditor } from "./rails";
-import { VideoRowActions } from "./video-actions";
+import { BannerRowActions, VideoRowActions } from "./video-actions";
 
 export const metadata = { title: "Витрина" };
 export const dynamic = "force-dynamic";
 
 export default async function StorefrontAdmin() {
-  const [rails, options, catalog, videos, sold] = await Promise.all([
+  const [banners, rails, options, catalog, videos, sold] = await Promise.all([
+    many<{ id: string; tone: string; bg: string; image: string | null; title: { ru: string }; active: boolean; starts: string | null; ends: string | null; state: "on" | "off" | "soon" | "ended"; views: number; clicks: number }>(
+      `SELECT id, tone, bg, coalesce(image_desktop, image_mobile) AS image, title, active, views, clicks,
+         to_char(starts_at AT TIME ZONE 'Asia/Tashkent', 'DD.MM') AS starts, to_char(ends_at AT TIME ZONE 'Asia/Tashkent', 'DD.MM') AS ends,
+         CASE WHEN NOT active THEN 'off' WHEN starts_at > now() THEN 'soon' WHEN ends_at <= now() THEN 'ended' ELSE 'on' END AS state
+       FROM banners ORDER BY sort, id`
+    ),
     railRows(),
     pickOptions(),
     getPublicCatalog(),
@@ -29,10 +35,40 @@ export default async function StorefrontAdmin() {
 
   return (
     <>
-      <PageHead title="Витрина" sub="Что видят на главной: видео креаторов с товарами и продающие ленты." />
+      <PageHead title="Витрина" sub="Что видят на главной: баннеры, видео с товарами и продающие ленты." />
       <section className="px-4 md:px-8">
         <div className="mb-3 flex items-center gap-3">
-          <h2 className="flex-1 text-[20px] font-bold">Видео креаторов</h2>
+          <h2 className="flex-1 text-[20px] font-bold">Баннеры на главной</h2>
+          <Link href="/admin/storefront/banners/new" className="h-10 rounded-full bg-accent px-4 text-[14px] font-semibold leading-10 text-white">+ Баннер</Link>
+        </div>
+        <p className="mb-3 text-[13px] text-muted">Карусель вверху главной. Порядок — как здесь. «Клики» — нажатия на кнопку баннера, доля — от показов.</p>
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {banners.map((b, i) => (
+            <li key={b.id} className={`overflow-hidden rounded-card bg-white ring-1 ring-line ${b.state === "on" ? "" : "opacity-70"}`}>
+              <Link href={`/admin/storefront/banners/${b.id}`} className="relative block aspect-[1440/560] p-4" style={{ background: b.bg }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {b.image && <img src={b.image} alt="" className="absolute inset-0 h-full w-full object-cover object-right" />}
+                <span className={`relative line-clamp-2 max-w-[60%] text-[17px] font-bold leading-tight ${b.tone === "dark" ? "text-white" : "text-ink"}`}>{b.title.ru}</span>
+              </Link>
+              <div className="p-3">
+                <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                  <span className={`rounded-full px-2 py-0.5 font-medium ${b.state === "on" ? "bg-[#e3f5e6] text-[#2f7a3a]" : "bg-surface text-muted"}`}>
+                    {b.state === "on" ? "показывается" : b.state === "off" ? "выключен" : b.state === "soon" ? `с ${b.starts}` : "акция закончилась"}
+                  </span>
+                  {(b.starts || b.ends) && <span className="text-muted">{b.starts ? `с ${b.starts}` : ""}{b.ends ? ` по ${b.ends}` : ""}</span>}
+                  <span className="ml-auto text-muted tabular">{b.views} показов · {b.clicks} кликов{b.views ? ` · ${((b.clicks / b.views) * 100).toFixed(1)}%` : ""}</span>
+                </div>
+                <BannerRowActions id={b.id} active={b.active} first={i === 0} last={i === banners.length - 1} />
+              </div>
+            </li>
+          ))}
+        </ul>
+        {banners.filter((b) => b.state === "on").length === 0 && <p className="mt-3 rounded-xl bg-[#fff1d6] px-3 py-2 text-[13px] text-[#9a5b00]">Ни один баннер сейчас не показывается — на главной стоит запасной.</p>}
+      </section>
+
+      <section className="mt-10 px-4 md:px-8">
+        <div className="mb-3 flex items-center gap-3">
+          <h2 className="flex-1 text-[20px] font-bold">Видео с товарами</h2>
           <Link href="/admin/storefront/videos/new" className="h-10 rounded-full bg-accent px-4 text-[14px] font-semibold leading-10 text-white">+ Видео</Link>
         </div>
         <p className="mb-3 text-[13px] text-muted">Блок «Обзоры» на главной. Нажатие открывает плеер: слева описание, справа товары из видео с кнопкой «в корзину». Порядок — как здесь.</p>

@@ -248,6 +248,7 @@ export async function parseProductsFile(buf: ArrayBuffer): Promise<ImportResult>
         ingredients: ingRu.map((ru, i) => pair(ru, ingUz[i] ?? "")),
         rank: rank.ru ? rank : null,
         reviewSummary: review.ru ? review : null,
+        about: pc.about ?? [], // «О товаре» в Excel не выгружается — при импорте сохраняем как было
       },
     };
 
@@ -294,6 +295,6 @@ async function productAsInput(r: ProductRow, variants: VariantRow[]) {
     price: Number(r.price), oldPrice: r.old_price != null ? Number(r.old_price) : null, costPrice: r.cost_price != null ? Number(r.cost_price) : null, stock: r.stock, active: r.active,
     badge: r.badge ?? "", rating: Number(r.rating), reviews: r.reviews, daysSupply: r.days_supply, color: r.color, pack: r.pack, images: r.images ?? [], fbt: r.fbt ?? [], sort: r.sort,
     variantKind: r.variant_kind ?? "", variants: variants.filter((v) => v.product_id === r.id),
-    content: { type: c.type ?? E, desc: c.desc ?? E, why: c.why ?? E, howTo: c.howTo ?? E, ingredients: c.ingredients ?? [], rank: c.rank ?? null, reviewSummary: c.reviewSummary ?? null },
+    content: { type: c.type ?? E, desc: c.desc ?? E, why: c.why ?? E, howTo: c.howTo ?? E, ingredients: c.ingredients ?? [], rank: c.rank ?? null, reviewSummary: c.reviewSummary ?? null, about: c.about ?? [] },
   };
 }

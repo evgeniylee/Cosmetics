@@ -9,6 +9,7 @@ import { saveProduct, uploadProductImage } from "../../actions";
 import { compressImage } from "@/lib/compress-image";
 import { Card, Toast } from "../../ui";
 import { VariantsEditor } from "./variants";
+import { AboutEditor } from "./about";
 
 type L = { ru: string; uz: string };
 const TR: Record<string, string> = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ы: "y", э: "e", ю: "yu", я: "ya" };
@@ -108,7 +109,9 @@ export function ProductForm({ initial, options, brands }: { initial: ProductInpu
     // У объёмов цена товара = минимальная цена объёма.
     const vPrices = p.variantKind === "volume" ? p.variants.map((v) => v.price ?? 0).filter((x) => x > 0) : [];
     const base = vPrices.length ? { ...p, price: Math.min(...vPrices) } : p;
-    const clean = { ...base, content: { ...p.content, ingredients: p.content.ingredients.filter((i) => i.ru.trim() || i.uz.trim()).map((i) => ({ ru: i.ru.trim(), uz: i.uz.trim() || i.ru.trim() })) } };
+    // Пустые текстовые блоки «О товаре» не сохраняем.
+    const about = p.content.about.filter((b) => b.type !== "text" || b.text.ru.trim() || b.text.uz.trim() || b.title.ru.trim());
+    const clean = { ...base, content: { ...p.content, about, ingredients: p.content.ingredients.filter((i) => i.ru.trim() || i.uz.trim()).map((i) => ({ ru: i.ru.trim(), uz: i.uz.trim() || i.ru.trim() })) } };
     const r = await saveProduct(clean);
     if (!r.ok) { setErrors(r.fields ?? {}); flash(r.error); return; }
     setErrors({});
@@ -224,6 +227,8 @@ export function ProductForm({ initial, options, brands }: { initial: ProductInpu
             <Field label="Что говорят в отзывах (необязательно)"><input className={input} value={p.content.reviewSummary?.[lang] ?? ""} onChange={(ev) => setOpt("reviewSummary", ev.target.value)} /></Field>
           </div>
         </Card>
+
+        <AboutEditor blocks={p.content.about} lang={lang} onChange={(b) => setC("about", b)} errors={errors} />
       </div>
 
       <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">

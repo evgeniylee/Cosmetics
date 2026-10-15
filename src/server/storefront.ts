@@ -3,7 +3,7 @@ import "server-only";
 import type { L10n, Product } from "@/data/catalog";
 import { discountPct } from "@/lib/shop";
 import { many } from "./db";
-import { RAIL_KEYS, type FeaturedCreator, type HomeRail, type HomeVideo, type RailKey } from "@/lib/storefront";
+import { RAIL_KEYS, type FeaturedCreator, type HeroBanner, type HomeRail, type HomeVideo, type RailKey } from "@/lib/storefront";
 export { RAIL_KEYS };
 
 export const RAIL_LIMIT = 12;
@@ -29,7 +29,7 @@ export function autoRail(key: RailKey, products: Product[], ctx: { sold: Map<str
 
 export async function loadStorefront(products: Product[]) {
   const ids = new Set(products.map((p) => p.id));
-  const [rails, soldRows, createdRows, videoRows, creatorRows] = await Promise.all([
+  const [rails, soldRows, createdRows, videoRows, creatorRows, bannerRows] = await Promise.all([
     railRows(),
     many<{ product_id: string; n: string | number }>(
       `SELECT i.product_id, SUM(i.qty) AS n FROM order_items i JOIN orders o ON o.id = i.order_id
@@ -41,6 +41,11 @@ export async function loadStorefront(products: Product[]) {
     ),
     many<{ code: string; creator_name: string; creator_handle: string | null; percent: number; picks: string[]; photo: string | null }>(
       `SELECT code, creator_name, creator_handle, percent, picks, photo FROM promo_codes WHERE active AND featured ORDER BY created_at LIMIT 8`
+    ),
+    // Баннеры: включённые и попадающие в даты показа.
+    many<{ id: string; tone: "light" | "dark"; bg: string; image_desktop: string | null; image_mobile: string | null; art: string[]; eyebrow: L10n; title: L10n; text: L10n; cta: L10n; href: string }>(
+      `SELECT id, tone, bg, image_desktop, image_mobile, art, eyebrow, title, text, cta, href FROM banners
+       WHERE active AND (starts_at IS NULL OR starts_at <= now()) AND (ends_at IS NULL OR ends_at > now()) ORDER BY sort, id LIMIT 10`
     ),
   ]);
   const ctx = {
@@ -58,7 +63,11 @@ export async function loadStorefront(products: Product[]) {
   const creators: FeaturedCreator[] = creatorRows
     .map((c) => ({ code: c.code, name: c.creator_name, handle: c.creator_handle, percent: c.percent, photo: c.photo, picks: (c.picks ?? []).filter((id) => ids.has(id)) }))
     .filter((c) => c.picks.length > 0);
-  return { rails: homeRails, videos, creators };
+  const banners: HeroBanner[] = bannerRows.map((b) => ({
+    id: b.id, tone: b.tone === "dark" ? "dark" : "light", bg: b.bg, art: b.art ?? [], eyebrow: b.eyebrow, title: b.title, text: b.text, cta: b.cta, href: b.href,
+    image: b.image_desktop || b.image_mobile ? { desktop: (b.image_desktop || b.image_mobile)!, mobile: (b.image_mobile || b.image_desktop)! } : undefined,
+  }));
+  return { rails: homeRails, videos, creators, banners };
 }
 
 /** Товары для выбора в админке (лента, видео). */

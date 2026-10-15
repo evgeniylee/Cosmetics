@@ -9,7 +9,7 @@ export const UPLOAD_DIR = process.env.UPLOAD_DIR || "./.data/uploads";
 
 const MAX = 4 * 1024 * 1024;
 const EXT: Record<string, string> = { "image/webp": ".webp", "image/jpeg": ".jpg", "image/png": ".png" };
-type Folder = "products" | "videos" | "creators";
+type Folder = "products" | "videos" | "creators" | "banners";
 
 const fileName = (ext: string) => `${Date.now().toString(36)}-${randomBytes(6).toString("hex")}${ext}`;
 

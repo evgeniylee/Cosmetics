@@ -3,12 +3,12 @@ import { createContext, useContext, useMemo } from "react";
 import type { Product } from "@/data/catalog";
 import { parseKey, withVariant } from "@/lib/variants";
 
-import type { FeaturedCreator, HomeRail, HomeVideo } from "@/lib/storefront";
+import type { FeaturedCreator, HeroBanner, HomeRail, HomeVideo } from "@/lib/storefront";
 
 export type { FeaturedCreator };
-type CatalogData = { products: Product[]; brands: string[]; creator: FeaturedCreator | null; creators: FeaturedCreator[]; rails: HomeRail[]; videos: HomeVideo[] };
+type CatalogData = { products: Product[]; brands: string[]; creator: FeaturedCreator | null; creators: FeaturedCreator[]; rails: HomeRail[]; videos: HomeVideo[]; banners: HeroBanner[] };
 
-const Ctx = createContext<CatalogData>({ products: [], brands: [], creator: null, creators: [], rails: [], videos: [] });
+const Ctx = createContext<CatalogData>({ products: [], brands: [], creator: null, creators: [], rails: [], videos: [], banners: [] });
 
 export function CatalogProvider({ value, children }: { value: CatalogData; children: React.ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

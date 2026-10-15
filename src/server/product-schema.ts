@@ -5,6 +5,17 @@ import { CATEGORIES, CONCERNS, PACKS, SKIN_TYPES } from "@/data/catalog";
 const L10n = z.object({ ru: z.string().trim().max(4000), uz: z.string().trim().max(4000) });
 const slugRe = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// «О товаре»: блоки текста, фото, видео и «фото + текст» — как rich-контент на маркетплейсах.
+const FileUrl = z.string().regex(/^\/[\w./-]+$/, "Файл не загружен");
+const L10nShort = z.object({ ru: z.string().trim().max(200), uz: z.string().trim().max(200) });
+export const AboutBlock = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text"), title: L10nShort, text: L10n }),
+  z.object({ type: z.literal("image"), src: FileUrl, caption: L10nShort }),
+  z.object({ type: z.literal("video"), src: FileUrl, poster: FileUrl.nullable(), caption: L10nShort }),
+  z.object({ type: z.literal("split"), src: FileUrl, title: L10nShort, text: L10n }),
+]);
+export type AboutBlockT = z.infer<typeof AboutBlock>;
+
 const Hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Цвет в формате #RRGGBB");
 export const VariantInput = z.object({
   id: z.string().max(40).optional(),
@@ -54,6 +65,7 @@ export const ProductInput = z.object({
     ingredients: z.array(L10n).max(20),
     rank: L10n.nullable(),
     reviewSummary: L10n.nullable(),
+    about: z.array(AboutBlock).max(20).default([]),
   }),
 });
 export type ProductInputT = z.infer<typeof ProductInput>;

@@ -36,12 +36,20 @@ export type Product = {
   fbt: string[];
   images?: string[];
   stock?: "in_stock" | "on_order" | "out";
+  /** «О товаре»: блоки текста, фото и видео под описанием. */
+  about?: AboutBlock[];
   /** Варианты: оттенки (цена общая, свой цвет и фото) или объёмы (своя цена). */
   variantKind?: VariantKind;
   variants?: Variant[];
   /** Заполнено, когда товар «развёрнут» под конкретный вариант (корзина, страница товара). */
   variant?: Variant;
 };
+
+export type AboutBlock =
+  | { type: "text"; title: L10n; text: L10n }
+  | { type: "image"; src: string; caption: L10n }
+  | { type: "video"; src: string; poster: string | null; caption: L10n }
+  | { type: "split"; src: string; title: L10n; text: L10n };
 
 export type VariantKind = "shade" | "volume";
 export type Variant = {

@@ -15,7 +15,7 @@ function toInput(r: ProductRow | null, vrows: VariantRow[] = []): ProductInputT 
     return {
       slug: "", brand: "", name: "", category: "serum", skin: [], concerns: [], volume: 50, unit: "ml", price: 0, oldPrice: null, costPrice: null,
       stock: "in_stock", active: false, badge: "", rating: 0, reviews: 0, daysSupply: 60, color: "#EADFD3", pack: "bottle", images: [], fbt: [], sort: 1000, variantKind: "", variants: [],
-      content: { type: EMPTY, desc: EMPTY, why: EMPTY, howTo: EMPTY, ingredients: [], rank: null, reviewSummary: null },
+      content: { type: EMPTY, desc: EMPTY, why: EMPTY, howTo: EMPTY, ingredients: [], rank: null, reviewSummary: null, about: [] },
     };
   const c = r.content ?? {};
   return {
@@ -32,7 +32,7 @@ function toInput(r: ProductRow | null, vrows: VariantRow[] = []): ProductInputT 
     })),
     content: {
       type: c.type ?? EMPTY, desc: c.desc ?? EMPTY, why: c.why ?? EMPTY, howTo: c.howTo ?? EMPTY, ingredients: c.ingredients ?? [],
-      rank: c.rank ?? null, reviewSummary: c.reviewSummary ?? null,
+      rank: c.rank ?? null, reviewSummary: c.reviewSummary ?? null, about: (c.about ?? []) as ProductInputT["content"]["about"],
     },
   };
 }

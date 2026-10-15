@@ -299,6 +299,8 @@ export function ProductDetail({ p: base, initialVariant }: { p: Product; initial
         </div>
       </div>
 
+      <AboutProduct p={p} />
+
       <div className="mt-12 md:mt-20"><FrequentlyBought p={p} /></div>
 
       {/* Отзывы */}
@@ -406,5 +408,57 @@ export function ProductDetail({ p: base, initialVariant }: { p: Product; initial
         </div>
       )}
     </div>
+  );
+}
+
+/** «О товаре»: блоки, которые админ собирает в карточке товара — текст, фото, видео, «фото + текст». */
+function AboutProduct({ p }: { p: Product }) {
+  const { lang } = useI18n();
+  const blocks = p.about ?? [];
+  if (!blocks.length) return null;
+  const tr = (v: { ru: string; uz: string }) => v[lang] || v.ru;
+  let split = 0;
+  return (
+    <section className="mt-12 md:mt-20" aria-labelledby="about-product">
+      <h2 id="about-product" className="h-section mb-6 md:mb-10">{lang === "ru" ? "О товаре" : "Mahsulot haqida"}</h2>
+      <div className="mx-auto max-w-[1040px] space-y-8 md:space-y-14">
+        {blocks.map((b, i) => {
+          if (b.type === "text")
+            return (
+              <div key={i} className="mx-auto max-w-[760px]">
+                {tr(b.title) && <h3 className="text-[20px] font-bold md:text-[26px]">{tr(b.title)}</h3>}
+                <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-ink/80 md:text-[17px]">{tr(b.text)}</p>
+              </div>
+            );
+          if (b.type === "image")
+            return (
+              <figure key={i}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={b.src} alt={tr(b.caption) || `${p.brand} ${p.name}`} loading="lazy" className="w-full rounded-panel bg-surface object-cover" />
+                {tr(b.caption) && <figcaption className="mt-2 text-center text-[14px] text-muted">{tr(b.caption)}</figcaption>}
+              </figure>
+            );
+          if (b.type === "video")
+            return (
+              <figure key={i} className="mx-auto max-w-[760px]">
+                <video src={b.src} poster={b.poster ?? undefined} controls playsInline preload="metadata" className="mx-auto block max-h-[80vh] max-w-full rounded-panel bg-ink" />
+                {tr(b.caption) && <figcaption className="mt-2 text-center text-[14px] text-muted">{tr(b.caption)}</figcaption>}
+              </figure>
+            );
+          // «Фото + текст»: каждый следующий такой блок зеркалится, чтобы страница читалась «зигзагом».
+          const flip = split++ % 2 === 1;
+          return (
+            <div key={i} className="grid items-center gap-5 md:grid-cols-2 md:gap-12">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={b.src} alt={tr(b.title) || `${p.brand} ${p.name}`} loading="lazy" className={`aspect-[4/3] w-full rounded-panel bg-surface object-cover ${flip ? "md:order-2" : ""}`} />
+              <div>
+                {tr(b.title) && <h3 className="text-[20px] font-bold md:text-[28px]">{tr(b.title)}</h3>}
+                <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-ink/80 md:text-[17px]">{tr(b.text)}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

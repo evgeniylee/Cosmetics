@@ -11,7 +11,7 @@ import { createPayout, onOrderStatus } from "@/server/creators";
 import { normalizePhone } from "@/server/auth";
 import { ProductInput, variantProblems } from "@/server/product-schema";
 import { newProductId, upsertProduct } from "@/server/products";
-import { RAIL_KEYS } from "@/lib/storefront";
+import { BANNER_ICONS, RAIL_KEYS } from "@/lib/storefront";
 import { TAGS } from "@/server/crm";
 
 export type ActionResult = { ok: true; message?: string; id?: string } | { ok: false; error: string; fields?: Record<string, string> };
@@ -100,7 +100,7 @@ export async function uploadProductImage(form: FormData): Promise<ActionResult &
   if (!(file instanceof File)) return { ok: false, error: "Файл не получен" };
   const folder = form.get("folder");
   try {
-    const url = await saveUpload(file, folder === "videos" || folder === "creators" ? folder : "products");
+    const url = await saveUpload(file, folder === "videos" || folder === "creators" || folder === "banners" ? folder : "products");
     return { ok: true, url };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Не удалось сохранить файл" };
@@ -344,4 +344,85 @@ export async function deleteVideo(id: string): Promise<ActionResult> {
   revalidatePath("/admin/storefront", "layout");
   revalidatePath("/", "layout");
   return { ok: true, message: "Видео удалено" };
+}
+
+// ---------- Баннеры главной ----------
+
+const BannerText = (max: number) => z.object({ ru: z.string().trim().max(max), uz: z.string().trim().max(max) });
+const Img = z.string().regex(/^\/[\w./-]+$/).nullable();
+const BannerInput = z.object({
+  id: z.string().regex(/^[\w-]{1,40}$/).nullable(),
+  tone: z.enum(["light", "dark"]),
+  bg: z.string().trim().min(4).max(300).regex(/^[#\w\s(),.%-]+$/, "Только цвет или градиент"),
+  imageDesktop: Img,
+  imageMobile: Img,
+  art: z.array(z.enum(BANNER_ICONS)).max(3),
+  eyebrow: BannerText(60),
+  title: z.object({ ru: z.string().trim().min(1, "Нужен заголовок").max(70), uz: z.string().trim().max(70) }),
+  text: BannerText(160),
+  cta: z.object({ ru: z.string().trim().min(1, "Текст кнопки").max(30), uz: z.string().trim().max(30) }),
+  href: z.string().trim().regex(/^\/[\w\-/?=&%.]*$/, "Ссылка внутри сайта, начинается с /"),
+  active: z.boolean(),
+  startsAt: z.string().nullable(),
+  endsAt: z.string().nullable(),
+});
+
+export async function saveBanner(input: unknown): Promise<ActionResult> {
+  await assertAdmin();
+  const parsed = BannerInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Проверьте поля", fields: fieldErrors(parsed.error) };
+  const b = parsed.data;
+  const day = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
+  const starts = day(b.startsAt), ends = day(b.endsAt);
+  if (starts && ends && ends < starts) return { ok: false, error: "Дата окончания раньше начала", fields: { endsAt: "Раньше начала" } };
+  const l = (v: { ru: string; uz: string }) => JSON.stringify({ ru: v.ru, uz: v.uz || v.ru });
+  const vals = [b.tone, b.bg, b.imageDesktop, b.imageMobile, b.art, l(b.eyebrow), l(b.title), l(b.text), l(b.cta), b.href, b.active,
+    // Даты — по Ташкенту: «с 1 ноября» = с полуночи 1 ноября, «по 10 ноября» = до конца дня 10 ноября.
+    starts ? `${starts}T00:00:00+05:00` : null, ends ? `${ends}T23:59:59+05:00` : null];
+  let id = b.id;
+  if (id) {
+    const r = await one(`UPDATE banners SET tone=$2, bg=$3, image_desktop=$4, image_mobile=$5, art=$6, eyebrow=$7, title=$8, text=$9, cta=$10, href=$11, active=$12,
+      starts_at=$13, ends_at=$14, updated_at=now() WHERE id=$1 RETURNING id`, [id, ...vals]);
+    if (!r) return { ok: false, error: "Баннер не найден" };
+  } else {
+    id = `b${Date.now().toString(36)}`;
+    await one(`INSERT INTO banners (id, tone, bg, image_desktop, image_mobile, art, eyebrow, title, text, cta, href, active, starts_at, ends_at, sort)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, (SELECT COALESCE(MAX(sort), 0) + 1 FROM banners))`, [id, ...vals]);
+  }
+  invalidateCatalog();
+  revalidatePath("/admin/storefront", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true, message: b.id ? "Баннер сохранён" : "Баннер добавлен", id };
+}
+
+export async function moveBanner(id: string, dir: -1 | 1): Promise<ActionResult> {
+  await assertAdmin();
+  const list = await many<{ id: string }>(`SELECT id FROM banners ORDER BY sort, id`);
+  const i = list.findIndex((x) => x.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return { ok: true };
+  [list[i], list[j]] = [list[j], list[i]];
+  for (const [n, x] of list.entries()) await one(`UPDATE banners SET sort = $2 WHERE id = $1`, [x.id, n]);
+  invalidateCatalog();
+  revalidatePath("/admin/storefront", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function setBannerActive(id: string, active: boolean): Promise<ActionResult> {
+  await assertAdmin();
+  await one(`UPDATE banners SET active = $2, updated_at = now() WHERE id = $1`, [id, active]);
+  invalidateCatalog();
+  revalidatePath("/admin/storefront", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function deleteBanner(id: string): Promise<ActionResult> {
+  await assertAdmin();
+  await one(`DELETE FROM banners WHERE id = $1`, [id]);
+  invalidateCatalog();
+  revalidatePath("/admin/storefront", "layout");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Баннер удалён" };
 }

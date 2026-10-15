@@ -440,4 +440,36 @@ CREATE INDEX customer_events_type ON customer_events(type, created_at);
 CREATE UNIQUE INDEX customers_telegram_user ON customers(telegram_user_id) WHERE telegram_user_id IS NOT NULL;
 `,
   },
+  {
+    id: "012_banners",
+    sql: `
+-- Баннеры главной (карусель). Были в коде — теперь в админке «Витрина → Баннеры».
+CREATE TABLE banners (
+  id text PRIMARY KEY,
+  tone text NOT NULL DEFAULT 'light',       -- light: тёмный текст на светлом фоне; dark: белый текст
+  bg text NOT NULL,                          -- цвет или градиент фона (под картинкой или вместо неё)
+  image_desktop text,                        -- картинка на весь баннер для ПК (если нет — иконки справа)
+  image_mobile text,                         -- картинка для телефона
+  art text[] NOT NULL DEFAULT '{}',          -- иконки категорий справа, если нет картинки
+  eyebrow jsonb NOT NULL DEFAULT '{"ru":"","uz":""}',
+  title jsonb NOT NULL,
+  text jsonb NOT NULL DEFAULT '{"ru":"","uz":""}',
+  cta jsonb NOT NULL,
+  href text NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  starts_at timestamptz,                     -- показывать с … (для акций)
+  ends_at timestamptz,                       -- … и до
+  sort integer NOT NULL DEFAULT 0,
+  views integer NOT NULL DEFAULT 0,
+  clicks integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO banners (id, tone, bg, image_desktop, image_mobile, art, eyebrow, title, text, cta, href, sort) VALUES
+('promise', 'light', 'radial-gradient(120% 90% at 80% 20%,#ffd9e8 0%,#f7c3d8 35%,#e7b7e0 70%,#cdb8ef 100%)', '/images/hero/hero-desktop.webp', '/images/hero/hero-mobile.webp', '{}', '{"ru": "Оригинальная корейская косметика", "uz": "Original koreys kosmetikasi"}', '{"ru": "Уход, который проверили до вас", "uz": "Sizdan oldin tekshirilgan parvarish"}', '{"ru": "Проверяем партию и срок годности, упаковываем как подарок и привозим завтра.", "uz": "Partiya va muddatni tekshiramiz, sovg''a kabi qadoqlab ertaga yetkazamiz."}', '{"ru": "Подобрать уход", "uz": "Parvarish tanlash"}', '/quiz', 0),
+('spf', 'light', 'radial-gradient(110% 90% at 75% 30%,#fff6d6 0%,#ffe7a8 40%,#ffd3a3 75%,#ffc4b8 100%)', NULL, NULL, '{spf,essence}', '{"ru": "Сезон SPF", "uz": "SPF mavsumi"}', '{"ru": "Санскрины без белых следов", "uz": "Oq izsiz quyoshdan himoya"}', '{"ru": "Лёгкие текстуры под макияж. Каждый день, даже в пасмурную погоду.", "uz": "Makiyaj ostiga yengil teksturalar. Har kuni."}', '{"ru": "Выбрать SPF", "uz": "SPF tanlash"}', '/catalog?cat=spf', 1),
+('acne', 'dark', 'radial-gradient(90% 90% at 80% 25%,#2f6b55 0%,#1b3d33 45%,#111814 100%)', NULL, NULL, '{toner,mask}', '{"ru": "Против акне", "uz": "Husnbuzarga qarshi"}', '{"ru": "Чистая кожа без агрессии", "uz": "Agressiyasiz toza teri"}', '{"ru": "Кислотные тонеры, центелла и патчи, которые работают за одну ночь.", "uz": "Kislotali tonerlar, sentella va bir kechada ishlaydigan patchlar."}', '{"ru": "Смотреть подборку", "uz": "To''plamni ko''rish"}', '/catalog?concern=acne', 2),
+('creator', 'dark', 'radial-gradient(100% 100% at 85% 20%,#ff8fbf 0%,#e4467e 40%,#7a2cc2 100%)', NULL, NULL, '{serum,cream}', '{"ru": "Выбор креаторов", "uz": "Kreatorlar tanlovi"}', '{"ru": "−10% по коду MADINA", "uz": "MADINA kodi bilan −10%"}', '{"ru": "Любимый уход Мадины: эссенция, санскрин и крем с церамидами.", "uz": "Madinaning sevimli parvarishi: essensiya, SPF va seramidli krem."}', '{"ru": "Смотреть подборку", "uz": "To''plamni ko''rish"}', '/catalog?creator=MADINA', 3),
+('hydra', 'light', 'radial-gradient(110% 90% at 78% 25%,#e3f1ff 0%,#c4dcf5 45%,#b9c8f0 80%,#d6c9f2 100%)', NULL, NULL, '{essence,cream,serum}', '{"ru": "Увлажнение", "uz": "Namlash"}', '{"ru": "Кожа не тянет даже зимой", "uz": "Qishda ham teri tortilmaydi"}', '{"ru": "Гиалуроновые сыворотки, ночные маски и кремы с церамидами.", "uz": "Gialuron zardoblari, tungi niqoblar va seramidli kremlar."}', '{"ru": "Выбрать увлажнение", "uz": "Namlashni tanlash"}', '/catalog?concern=dryness', 4);
+`,
+  },
 ];

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { compressImage } from "@/lib/compress-image";
+import { VIDEO_MAX_MB, frameToFile, uploadVideo } from "@/lib/admin-upload";
 import { saveVideo, uploadProductImage } from "../../../actions";
 import { Card, Toast } from "../../../ui";
 import { ProductPicker, type PickOption } from "../../picker";
@@ -12,36 +13,8 @@ export type VideoFormValue = {
   src: string; poster: string | null; products: string[]; active: boolean;
 };
 
-const MAX_MB = 80;
+const MAX_MB = VIDEO_MAX_MB;
 const input = "h-11 w-full rounded-xl border border-line bg-white px-3 text-[15px] outline-none focus:border-accent";
-
-function uploadVideo(file: File, onProgress: (p: number) => void) {
-  return new Promise<string>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/admin/upload/video");
-    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
-    xhr.onload = () => {
-      try {
-        const r = JSON.parse(xhr.responseText);
-        if (xhr.status === 200 && r.url) resolve(r.url); else reject(new Error(r.error || "Не удалось загрузить"));
-      } catch { reject(new Error("Не удалось загрузить")); }
-    };
-    xhr.onerror = () => reject(new Error("Сеть прервалась — попробуйте ещё раз"));
-    xhr.send(file);
-  });
-}
-
-async function frameToFile(video: HTMLVideoElement) {
-  const c = document.createElement("canvas");
-  const k = Math.min(1, 1080 / Math.max(video.videoWidth, video.videoHeight));
-  c.width = Math.round(video.videoWidth * k);
-  c.height = Math.round(video.videoHeight * k);
-  c.getContext("2d")!.drawImage(video, 0, 0, c.width, c.height);
-  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.85));
-  if (!blob) throw new Error("Не удалось снять кадр");
-  return compressImage(new File([blob], "poster.jpg", { type: "image/jpeg" }), 1080);
-}
 
 export function VideoForm({ initial, options }: { initial: VideoFormValue; options: PickOption[] }) {
   const [f, setF] = useState(initial);
