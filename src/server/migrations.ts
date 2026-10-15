@@ -433,4 +433,11 @@ CREATE INDEX crm_tasks_open ON crm_tasks(due) WHERE done_at IS NULL;
 CREATE INDEX customer_events_type ON customer_events(type, created_at);
 `,
   },
+  {
+    id: "011_telegram_app",
+    sql: `
+-- Вход из Telegram Mini App: один Telegram-аккаунт — один клиент.
+CREATE UNIQUE INDEX customers_telegram_user ON customers(telegram_user_id) WHERE telegram_user_id IS NOT NULL;
+`,
+  },
 ];

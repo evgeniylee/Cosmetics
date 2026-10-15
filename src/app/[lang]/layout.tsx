@@ -10,6 +10,7 @@ import { SearchOverlay } from "@/components/SearchOverlay";
 import { AddedSheet } from "@/components/AddedSheet";
 import { Attribution } from "@/components/Attribution";
 import { AccountSync, LoginSheet } from "@/components/Auth";
+import { TelegramMiniApp } from "@/components/TelegramMiniApp";
 import { CatalogProvider } from "@/components/CatalogProvider";
 import { getPublicCatalog } from "@/server/catalog";
 
@@ -46,6 +47,7 @@ export default async function LangLayout({ children, params }: { children: React
           <AddedSheet />
           <LoginSheet />
           <AccountSync />
+          <TelegramMiniApp />
           </CatalogProvider>
         </I18nProvider>
       </body>

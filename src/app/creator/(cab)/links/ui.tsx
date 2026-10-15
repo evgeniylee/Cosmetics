@@ -32,8 +32,17 @@ function Qr({ url }: { url: string }) {
   );
 }
 
+/** Та же ссылка, но открывает магазин сразу внутри Telegram (Mini App). Нужен NEXT_PUBLIC_TG_APP_URL. */
+const TG_APP = process.env.NEXT_PUBLIC_TG_APP_URL || "";
+const tgLink = (url: string) => {
+  const m = /\/c\/([A-Za-z0-9]+)(?:\/([\w-]+))?\/?$/.exec(url);
+  return TG_APP && m ? `${TG_APP}?startapp=c_${m[1]}${m[2] ? `_${m[2]}` : ""}` : null;
+};
+
 export function LinkRow({ url, id, archived }: { url: string; id?: string; archived?: boolean }) {
   const [copied, copy] = useCopy();
+  const [tgCopied, copyTg] = useCopy();
+  const tg = tgLink(url);
   const [qr, setQr] = useState(false);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -45,6 +54,7 @@ export function LinkRow({ url, id, archived }: { url: string; id?: string; archi
       </div>
       <div className="mt-1.5 flex gap-4 text-[13px]">
         <button type="button" onClick={() => setQr((v) => !v)} className="text-muted underline">{qr ? "Скрыть QR" : "QR-код"}</button>
+        {tg && <button type="button" onClick={() => copyTg(tg)} title="Магазин откроется сразу внутри Telegram" className="text-[#1f8fd0] underline">{tgCopied ? "Скопировано ✓" : "Ссылка для Telegram"}</button>}
         {id && (
           <button type="button" disabled={pending} onClick={() => start(async () => { await archiveLink(id, !archived); router.refresh(); })} className="text-muted underline">
             {archived ? "Вернуть" : "В архив"}

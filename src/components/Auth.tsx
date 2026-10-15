@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { track } from "@/lib/analytics";
 import { ApiError, api, storedUtm, type ApiCustomer } from "@/lib/api";
 import { useSession, useShop, useUi } from "@/store/shop";
+import { haptic, tgName, tma } from "@/lib/tma";
 import { useI18n } from "./I18n";
 import { Icon } from "./Icon";
 
@@ -61,6 +62,46 @@ export function AuthFlow({ onDone }: { onDone: (c: ApiCustomer) => void }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  // Внутри Telegram: номер одним нажатием — Telegram подписывает контакт, код не нужен.
+  const [inTg, setInTg] = useState(false);
+  useEffect(() => {
+    // Скрипт Telegram грузится асинхронно — проверяем сейчас и когда он будет готов.
+    const check = () => setInTg(!!tma()?.requestContact && !!tma()?.isVersionAtLeast("6.9"));
+    check();
+    window.addEventListener("nabi:tma-ready", check);
+    return () => window.removeEventListener("nabi:tma-ready", check);
+  }, []);
+  const shareContact = () => {
+    const w = tma();
+    if (!w?.requestContact) return;
+    setErr({});
+    w.requestContact(async (shared, res) => {
+      if (!shared) return;
+      if (!res?.response) { setErr({ phone: ru ? "Telegram не передал номер. Введите его ниже — пришлём код." : "Telegram raqamni yubormadi. Uni pastga kiriting." }); return; }
+      setBusy(true);
+      try {
+        const r = await fetch("/api/tma/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: w.initData, contact: res.response }) });
+        const j = await r.json();
+        if (!r.ok) {
+          setErr({ phone: j.error === "not_uz_phone" ? (ru ? "В Telegram указан не узбекский номер. Введите номер +998 ниже." : "Telegramda O'zbekiston raqami emas. +998 raqamni kiriting.") : t.coGatewayDown });
+          return;
+        }
+        track("otp_verified", { is_new: j.isNew, place: "login", channel: "telegram_contact" });
+        haptic("success");
+        setCustomer(j.customer);
+        if (j.customer.needsProfile) {
+          const n = tgName ?? { first: w.initDataUnsafe.user?.first_name ?? "", last: w.initDataUnsafe.user?.last_name ?? "" };
+          setFirst((f) => f || n.first); setLast((l) => l || n.last);
+          setStep("profile");
+        } else onDone(j.customer);
+      } catch {
+        setErr({ phone: t.coGatewayDown });
+      } finally {
+        setBusy(false);
+      }
+    });
   };
 
   const verify = async (v: string) => {
@@ -179,6 +220,14 @@ export function AuthFlow({ onDone }: { onDone: (c: ApiCustomer) => void }) {
 
   return (
     <div className="space-y-3">
+      {inTg && (
+        <>
+          <button type="button" onClick={shareContact} disabled={busy} className="flex h-12 w-full items-center justify-center gap-2 rounded-card bg-[#2AABEE] font-semibold text-white transition active:scale-[.98] disabled:opacity-40">
+            {busy ? <Spinner /> : <Icon name="telegram" size={20} />} {ru ? "Войти через Telegram" : "Telegram orqali kirish"}
+          </button>
+          <p className="text-center text-[12px] text-muted">{ru ? "Telegram передаст ваш номер — код не нужен. Или введите номер:" : "Telegram raqamingizni yuboradi — kod kerak emas. Yoki raqamni kiriting:"}</p>
+        </>
+      )}
       <label htmlFor="phone" className="text-[13px] font-medium text-ink/70">{t.coPhone}</label>
       <input id="phone" type="tel" inputMode="tel" autoComplete="tel" value={fmtPhone(d)} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === "Enter" && request()} className={`${inputCls} tabular`} />
       {err.phone && <p role="alert" className="text-[13px] text-warn">{err.phone}</p>}
@@ -311,5 +360,7 @@ export async function logoutEverywhere(all: boolean) {
   await api.logout(all).catch(() => {});
   useShop.getState().resetPersonal();
   try { localStorage.removeItem(MARK); } catch { /* приватный режим */ }
+  // В Telegram после выхода не входим автоматически снова до следующего запуска.
+  try { sessionStorage.setItem("nabi_tma_noauto", "1"); } catch { /* приватный режим */ }
   useSession.getState().setCustomer(null);
 }

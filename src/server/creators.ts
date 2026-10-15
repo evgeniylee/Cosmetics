@@ -40,8 +40,10 @@ export function newLinkId() {
   return Array.from(randomBytes(6), (b) => abc[b % abc.length]).join("");
 }
 
+// Превью ссылок (TelegramBot, WhatsApp, Facebook…) — не переходы. Встроенный браузер Telegram
+// («Telegram-Android/…» в адресе браузера) — настоящий человек, его считаем.
 export const isBot = (ua: string) =>
-  !ua || /bot|crawl|spider|preview|facebookexternalhit|whatsapp|telegram|slack|discord|vkshare|skype|headless|curl|wget|python|okhttp/i.test(ua);
+  !ua || /bot\b|bot\/|bot;|crawl|spider|preview|facebookexternalhit|whatsapp|telegrambot|slack|discord|vkshare|skype|headless|curl|wget|python|okhttp/i.test(ua);
 
 /** Креатор для нового заказа. customer — вошедший клиент или null (гость). */
 export async function attributeOrder(opts: { customerId: string | null; ordersBefore: number; phone: string; promoCode: string | null }): Promise<Attribution | null> {

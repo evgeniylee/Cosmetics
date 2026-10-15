@@ -56,6 +56,7 @@ export function visitSource(): string {
   try {
     const u = new URL(window.location.href);
     const promo = u.searchParams.get("promo");
+    if (u.searchParams.get("utm_source") !== "creator" && (location.hash.includes("tgWebAppData") || sessionStorage.getItem("nabi_tma") || sessionStorage.getItem("__telegram__initParams"))) return "telegram_app";
     const utm = u.searchParams.get("utm_source");
     if (utm === "creator" && promo) return `creator:${promo.toUpperCase().slice(0, 20)}`;
     if (utm) return `utm:${utm.replace(/[^\w.-]/g, "").slice(0, 40)}`;
